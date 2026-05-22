@@ -14,6 +14,8 @@
 - "Quiero ver las autorizaciones del afiliado 20120667468"
 - "Mostrame los medicamentos autorizados para 20120667468"
 - "Autorizaciones vigentes de 20120667468"
+- "Autorizaciones del afiliado 27290758187"
+- "Medicamentos autorizados para 27352722958"
 
 ### 1.2 Con filtro por medicamento
 - "Autorizaciones de atorvastatina para 20120667468"
@@ -44,6 +46,8 @@
 - "¿Qué cronicidades tiene el afiliado 20120667468?"
 - "Tratamientos crónicos de 20120667468"
 - "Patologías de 20120667468"
+- "Cronicidades del afiliado 27290758187"
+- "Tratamientos crónicos de 27383803786"
 
 ### 2.2 Con filtro por medicamento
 - "Cronicidad de insulina para 20120667468"
@@ -69,6 +73,8 @@
 - "¿Existe el afiliado 20120667468?"
 - "Validar CUIL 20120667468"
 - "Buscar afiliado 20120667468"
+- "¿Existe el afiliado 27290758187?"
+- "Validar CUIL 27352722958"
 
 ### 3.2 Afiliado no existente
 - "¿Existe el afiliado 00000000000?"
@@ -148,11 +154,40 @@
 
 ## 7. Datos de Prueba Conocidos
 
-| CUIL | Titular/Familiar | Autorizaciones | Cronicidad |
+### Con autorizaciones + cronicidad (recomendados para pruebas completas)
+
+| CUIL | Titular/Familiar | Autorizaciones | Cronicidad | Notas |
+|---|---|---|---|---|
+| 20120667468 | Titular | 6 | 7 | Datos variados, ideal para pruebas generales |
+| 27290758187 | Titular | 92 | 22 | Muchos datos de ambos tipos |
+| 27352722958 | Titular | 174 | 7 | Titular con muchas autorizaciones |
+| 20219155922 | Titular | 164 | 8 | Buen balance de ambos |
+| 27383803786 | Titular | 152 | 10 | Buen balance de ambos |
+| 27242300357 | Titular | 147 | 6 | Titular con datos variados |
+
+### Solo autorizaciones (sin cronicidad visible)
+
+| CUIL | Titular/Familiar | Autorizaciones | Notas |
 |---|---|---|---|
-| 20120667468 | Titular | 6 (atorvastatina, triamcinolona, etc.) | 7 (diabetes, alta complejidad, etc.) |
-| 00000000000 | No existe | 0 | 0 |
-| 20999999999 | No existe | 0 | 0 |
+| 27276301506 | Titular | Varios | Solo autorizaciones |
+| 27344142268 | Titular | Varios | Solo autorizaciones |
+| 27244566028 | Titular | Varios | Solo autorizaciones |
+
+### Solo cronicidad (pocas o sin autorizaciones recientes)
+
+| CUIL | Titular/Familiar | Cronicidad | Notas |
+|---|---|---|---|
+| 27201660527 | Titular | Tiene | Solo cronicidad |
+| 20926785061 | Titular | Tiene | Solo cronicidad |
+
+### CUILs que NO existen (para probar errores)
+
+| CUIL | Uso |
+|---|---|
+| 00000000000 | No existe en sistema |
+| 20999999999 | No existe en sistema |
+| 12345 | Inválido (menos de 11 dígitos) |
+| 2012066746 | Inválido (10 dígitos) |
 
 ---
 
