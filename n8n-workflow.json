@@ -10,10 +10,7 @@
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [
-        250,
-        300
-      ],
+      "position": [250, 300],
       "name": "Webhook",
       "id": "asesores-webhook-01",
       "webhookId": "asesores-chat"
@@ -24,10 +21,7 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        500,
-        300
-      ],
+      "position": [500, 300],
       "name": "Parse Intent",
       "id": "asesores-parse-01"
     },
@@ -47,12 +41,19 @@
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        750,
-        300
-      ],
+      "position": [750, 300],
       "name": "API Request",
       "id": "asesores-api-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "const apiResponse = $input.first().json;\nconst action = $vars.action || 'unknown';\n\nif (apiResponse.error) {\n  return [{ json: { text: `Error: ${apiResponse.error}` } }];\n}\n\nif (apiResponse.exists !== undefined) {\n  // Es un exists\n  const tipo = apiResponse.tipo || 'afiliado';\n  const msg = apiResponse.exists\n    ? `El CUIL ${apiResponse.cuil} existe en el sistema como ${tipo}.`\n    : `El CUIL ${apiResponse.cuil} no existe en el sistema.`;\n  return [{ json: { text: msg, raw: apiResponse } }];\n}\n\nif (!apiResponse.data || apiResponse.data.length === 0) {\n  return [{ json: { text: 'No se encontraron registros para esta consulta.', raw: apiResponse } }];\n}\n\nlet text = '';\nconst items = apiResponse.data;\nconst count = apiResponse.count || items.length;\n\nif (items[0].numeroautorizacion !== undefined) {\n  // Autorizaciones\n  text = `Encontré ${count} autorizacion(es) vigente(s):\\n\\n`;\n  items.forEach((item, i) => {\n    text += `${i + 1}. **${item.monodroga || 'Medicamento'}**` +\n      (item.potencia ? ` ${item.potencia}mg` : '') +\n      ` — Autorizado: ${item.fecha}, Vence: ${item.fechavencimiento}, Cobertura: ${item.idporcentaje || 'N/A'}%` +\n      ` (Cod: ${item.codmonodroga || 'N/A'}, Unidades: ${item.unidades || 'N/A'})\\n`;\n  });\n} else if (items[0].cronicidad !== undefined) {\n  // Cronicidad\n  text = `Encontré ${count} tratamiento(s) cronico(s):\\n\\n`;\n  items.forEach((item, i) => {\n    text += `${i + 1}. **${item.cronicidad || 'Patologia'}** — ${item.monodroga || 'Medicamento'}` +\n      (item.potencia ? ` ${item.potencia}mg` : '') +\n      ` — Cobertura: ${item.cobertura || 'N/A'} — Vence: ${item.fechavencimiento || 'N/A'}\\n`;\n  });\n} else {\n  // Generico\n  text = `Encontré ${count} resultado(s):\\n\\n`;\n  items.forEach((item, i) => {\n    text += `${i + 1}. ${JSON.stringify(item)}\\n`;\n  });\n}\n\nreturn [{ json: { text, raw: apiResponse } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1000, 300],
+      "name": "Format Response",
+      "id": "asesores-format-01"
     },
     {
       "parameters": {
@@ -62,10 +63,7 @@
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [
-        1000,
-        300
-      ],
+      "position": [1250, 300],
       "name": "Responder",
       "id": "asesores-responder-01"
     }
@@ -94,6 +92,17 @@
       ]
     },
     "API Request": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
       "main": [
         [
           {
