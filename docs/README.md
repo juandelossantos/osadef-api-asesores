@@ -10,6 +10,7 @@ Bienvenido a la carpeta de documentación de `osadef-api-asesores`. Acá encontr
 |---|---|---|
 | [**DEV-MANUAL.md**](DEV-MANUAL.md) | Manual completo del desarrollador: stack, URLs, deploy, troubleshooting, seguridad, convenciones | Desarrolladores, DevOps, IT |
 | [**TEST-CASES.md**](TEST-CASES.md) | Casos de prueba para validar el widget de chat de ElevenLabs | QA, testers, desarrolladores |
+| [**WIDGET-INSTALL.md**](WIDGET-INSTALL.md) | Guía de instalación del widget en el portal + pruebas de validación | Webmasters, frontend devs, QA |
 | [**elevenlabs-setup.md**](elevenlabs-setup.md) | Guía paso a paso para configurar el agente de ElevenLabs Conversational AI | Desarrolladores, administradores ElevenLabs |
 | [**elevenlabs-tool-config.json**](elevenlabs-tool-config.json) | Configuración JSON de la herramienta webhook en ElevenLabs | Desarrolladores (copiar y pegar) |
 | [**system-prompt.txt**](system-prompt.txt) | System prompt del agente de IA (listo para copiar y pegar en ElevenLabs) | Desarrolladores, administradores ElevenLabs |
@@ -35,6 +36,12 @@ Bienvenido a la carpeta de documentación de `osadef-api-asesores`. Acá encontr
 - **Hacer deploy** → Leer [`DEV-MANUAL.md`](DEV-MANUAL.md) sección 7
 - **Arreglar un bug** → Leer [`DEV-MANUAL.md`](DEV-MANUAL.md) sección 9 (Troubleshooting)
 - **Correr tests** → Leer [`DEV-MANUAL.md`](DEV-MANUAL.md) sección 6.6
+
+### Soy webmaster / frontend dev y quiero...
+- **Instalar el widget en el portal** → Leer [`WIDGET-INSTALL.md`](WIDGET-INSTALL.md) sección 1 (código del widget)
+- **Personalizar colores del widget** → Leer [`WIDGET-INSTALL.md`](WIDGET-INSTALL.md) sección 3
+- **Validar que el widget funciona** → Leer [`WIDGET-INSTALL.md`](WIDGET-INSTALL.md) sección 5 (pruebas)
+- **Arreglar problemas del widget** → Leer [`WIDGET-INSTALL.md`](WIDGET-INSTALL.md) sección 8 (troubleshooting)
 
 ### Soy QA/tester y quiero...
 - **Probar el widget** → Leer [`TEST-CASES.md`](TEST-CASES.md) y seguir las consultas de prueba
