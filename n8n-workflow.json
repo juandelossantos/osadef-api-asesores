@@ -1,0 +1,111 @@
+{
+  "name": "OSADEF Asesores - Chat",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "asesores-chat",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ],
+      "name": "Webhook",
+      "id": "asesores-webhook-01",
+      "webhookId": "asesores-chat"
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst body = item.body || item;\n\nconst cuil = body.cuil;\nconst action = body.action;\nconst monodroga = body.monodroga;\nconst desde = body.desde;\nconst hasta = body.hasta;\nconst venceEnDias = body.vence_en_dias;\n\nif (!cuil || !/^\\d{11}$/.test(String(cuil))) {\n  return [{ json: { error: 'CUIL invalido. Debe tener 11 digitos numericos.' } }];\n}\n\nif (!action) {\n  return [{ json: { error: 'Falta la accion. Use: autorizaciones, cronicidad, o exists.' } }];\n}\n\nlet apiUrl = '';\nconst base = 'https://asesores-api.osadef.org.ar';\n\nif (['autorizaciones','autorizacion','medicamentos'].includes(action)) {\n  apiUrl = `${base}/autorizaciones?cuil=${cuil}`;\n  if (monodroga) apiUrl += `&monodroga=${encodeURIComponent(monodroga)}`;\n  if (desde) apiUrl += `&desde=${encodeURIComponent(desde)}`;\n  if (hasta) apiUrl += `&hasta=${encodeURIComponent(hasta)}`;\n} else if (['cronicidad','cronico','tratamiento','patologia'].includes(action)) {\n  apiUrl = `${base}/cronicidad?cuil=${cuil}`;\n  if (monodroga) apiUrl += `&monodroga=${encodeURIComponent(monodroga)}`;\n  if (venceEnDias) apiUrl += `&vence_en_dias=${encodeURIComponent(venceEnDias)}`;\n} else if (['exists','validar','afiliado'].includes(action)) {\n  apiUrl = `${base}/afiliados/exists?cuil=${cuil}`;\n} else {\n  return [{ json: { error: `Accion '${action}' no reconocida. Use: autorizaciones, cronicidad, o exists.` } }];\n}\n\nreturn [{ json: { apiUrl, cuil, action } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ],
+      "name": "Parse Intent",
+      "id": "asesores-parse-01"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.apiUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer a3e6b1c4d7f8g9h0i2j3k4l5m6n7o8p9q0r1s2t3u4v5w6x7y8z9a0b1c2d3e4f5"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        750,
+        300
+      ],
+      "name": "API Request",
+      "id": "asesores-api-01"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1000,
+        300
+      ],
+      "name": "Responder",
+      "id": "asesores-responder-01"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Intent": {
+      "main": [
+        [
+          {
+            "node": "API Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Request": {
+      "main": [
+        [
+          {
+            "node": "Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
