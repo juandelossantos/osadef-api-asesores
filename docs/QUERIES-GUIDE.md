@@ -17,16 +17,31 @@
 
 ## A) Consultas Directas (básicas)
 
-### 1. Autorizaciones completas de un afiliado
+### 1. Autorizaciones completas de un afiliado (medicamentos + prácticas)
 | Ejemplo | Respuesta esperada |
 |---|---|
-| "Quiero ver las autorizaciones del afiliado 20120667468" | Lista de autorizaciones vigentes |
+| "Quiero ver las autorizaciones del afiliado 20120667468" | Lista de autorizaciones vigentes (medicamentos + prácticas) |
 | "¿Qué medicamentos tiene autorizados el titular 20120667468?" | Lista con monodroga, fecha, vencimiento, cobertura |
 | "Autorizaciones vigentes del familiar 20120667468" | Mismo formato, busca en tabla familiar |
 | "¿Qué puede retirar el afiliado 20120667468?" | Sinónimo de "autorizaciones" |
 | "¿Qué recetas tiene autorizadas María García?" | **Nota:** requiere CUIL. El asesor debe saberlo o buscarlo. |
 
+**Nota:** El endpoint de autorizaciones **incluye tanto medicamentos como prácticas médicas**. Cada resultado tiene un campo `tipo` que indica si es medicamento o práctica. El asistente separa ambas categorías en la respuesta.
+
 **Tool llamada:** `action="autorizaciones"`, `cuil="20120667468"`
+
+### 1b. Autorizaciones de prácticas específicas
+| Ejemplo | Respuesta esperada |
+|---|---|
+| "¿Qué prácticas tiene autorizadas el afiliado 20120667468?" | Lista de prácticas médicas autorizadas |
+| "Mostrame las prestaciones de 20120667468" | Lista de prestaciones con práctica, fecha, médico |
+| "¿Qué estudios le autorizaron a 20120667468?" | Prácticas/procedimientos autorizados |
+| "Prácticas autorizadas del afiliado 20120667468 desde enero 2025" | Prácticas filtradas por fecha |
+| "¿Qué prácticas de cardiología tiene 20120667468?" | Prácticas filtradas por especialidad/práctica |
+
+**Nota:** Las prácticas se obtienen del mismo endpoint `/autorizaciones`. El filtro `monodroga` también busca por nombre de práctica. Ejemplo: si el asesor pregunta "prácticas de cardiología", el agente envía `monodroga="cardiologia"` y el API filtra tanto medicamentos como prácticas cuyo nombre contenga "cardiologia".
+
+**Tool llamada:** `action="autorizaciones"`, `cuil="20120667468"`, `monodroga="cardiologia"`
 
 ---
 

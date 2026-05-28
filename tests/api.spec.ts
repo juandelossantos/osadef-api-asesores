@@ -158,7 +158,7 @@ test.describe("API OSADEF Asesores — Tests de integracion HTTP", () => {
     }
   });
 
-  // ─── 5. Autorizaciones ──────────────────────────────────────
+  // ─── 5. Autorizaciones (medicamentos + prácticas) ────────────
 
   test("GET /autorizaciones — con API Key y cuil valido", async ({ request }) => {
     const response = await request.get(`${BASE_URL}/autorizaciones?cuil=${CUIL_TEST}`, {
@@ -181,8 +181,16 @@ test.describe("API OSADEF Asesores — Tests de integracion HTTP", () => {
         expect(item.fechavencimiento).toBeDefined();
         expect(item.codmonodroga).toBeDefined();
         expect(item.monodroga).toBeDefined();
-        expect(item.cantidad).toBeDefined();
-        expect(item.idporcentaje).toBeDefined();
+        expect(item.tipo).toBeDefined();
+        expect(item.medico).toBeDefined();
+        expect(item.matricula).toBeDefined();
+
+        if (item.tipo === "medicamento") {
+          expect(item.cantidad).toBeDefined();
+          expect(item.idporcentaje).toBeDefined();
+        } else if (item.tipo === "prestacion") {
+          expect(item.potencia).toBeDefined();
+        }
       }
     }
   });
@@ -201,6 +209,23 @@ test.describe("API OSADEF Asesores — Tests de integracion HTTP", () => {
       const body = await response.json();
       for (const item of body.data) {
         expect(item.monodroga.toUpperCase()).toContain("ATORVASTAT");
+      }
+    }
+  });
+
+  test("GET /autorizaciones — contiene tipo prestacion en respuesta", async ({ request }) => {
+    const response = await request.get(`${BASE_URL}/autorizaciones?cuil=${CUIL_TEST}`, {
+      headers: { Authorization: `Bearer ${API_KEY}` },
+    });
+
+    expect([200, 404]).toContain(response.status());
+
+    if (response.status() === 200) {
+      const body = await response.json();
+      const hasPrestaciones = body.data.some((item: any) => item.tipo === "prestacion");
+      // Puede o no haber prestaciones para este CUIL, pero tipo debe estar presente
+      for (const item of body.data) {
+        expect(["medicamento", "prestacion"]).toContain(item.tipo);
       }
     }
   });

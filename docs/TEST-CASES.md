@@ -8,14 +8,26 @@
 
 ---
 
-## 1. Autorizaciones de Medicamentos
+## 1. Autorizaciones (Medicamentos + Prácticas)
 
-### 1.1 Consulta básica
+### 1.1 Consulta básica (unificada)
 - "Quiero ver las autorizaciones del afiliado 20120667468"
 - "Mostrame los medicamentos autorizados para 20120667468"
 - "Autorizaciones vigentes de 20120667468"
 - "Autorizaciones del afiliado 27290758187"
 - "Medicamentos autorizados para 27352722958"
+
+### 1.5 Prácticas médicas (nuevo)
+- "¿Qué prácticas tiene autorizadas el afiliado 20120667468?"
+- "Mostrame las prestaciones de 20120667468"
+- "¿Qué estudios le autorizaron a 27290758187?"
+- "Prácticas autorizadas del afiliado 27352722958"
+- "Prestaciones médicas de 20120667468"
+
+### 1.6 Prácticas con filtro
+- "Prácticas del afiliado 20120667468 desde enero 2025"
+- "¿Qué prácticas de cardiología tiene 20120667468?"
+- "Prestaciones de 27290758187 entre 2024 y 2025"
 
 ### 1.2 Con filtro por medicamento
 - "Autorizaciones de atorvastatina para 20120667468"
@@ -156,14 +168,15 @@
 
 ### Con autorizaciones + cronicidad (recomendados para pruebas completas)
 
-| CUIL | Titular/Familiar | Autorizaciones | Cronicidad | Notas |
-|---|---|---|---|---|
-| 20120667468 | Titular | 6 | 7 | Datos variados, ideal para pruebas generales |
-| 27290758187 | Titular | 92 | 22 | Muchos datos de ambos tipos |
-| 27352722958 | Titular | 174 | 7 | Titular con muchas autorizaciones |
-| 20219155922 | Titular | 164 | 8 | Buen balance de ambos |
-| 27383803786 | Titular | 152 | 10 | Buen balance de ambos |
-| 27242300357 | Titular | 147 | 6 | Titular con datos variados |
+| CUIL | Titular/Familiar | Medicamentos | Prácticas | Cronicidad | Notas |
+|---|---|---|---|---|---|
+| 20120667468 | Titular | 6 | 0 | 7 | Datos variados, ideal para pruebas generales. Solo medicamentos. |
+| 27290758187 | Titular | 92 | Muchas | 22 | Medicamentos + prácticas. Verificar separación por tipo. |
+| 27352722958 | Titular | 93 | Muchas | 7 | Medicamentos + prácticas. |
+| 20219155922 | Titular | 91 | Muchas | 8 | Medicamentos + prácticas. |
+| 27383803786 | Titular | 85 | Muchas | 10 | Medicamentos + prácticas. |
+| 27242300357 | Titular | 147 | Muchas | 6 | Titular con datos variados |
+| **27248817939** | **Titular** | **5** | **197** | **?** | **Ideal para probar prácticas médicas** |
 
 ### Solo autorizaciones (sin cronicidad visible)
 

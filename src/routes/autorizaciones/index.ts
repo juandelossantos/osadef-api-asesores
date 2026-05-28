@@ -22,6 +22,9 @@ const autorizacionItemSchema = {
     unidades: { type: "string", example: "0030" },
     cantidad: { type: "string", example: "02" },
     idporcentaje: { type: "string", example: "40" },
+    tipo: { type: "string", example: "medicamento" },
+    medico: { type: "string", example: "" },
+    matricula: { type: "string", example: "" },
   },
 };
 
@@ -39,7 +42,7 @@ export default async function autorizacionesRoute(fastify: FastifyInstance) {
       preHandler: authGuard,
       schema: {
         description:
-          "Obtiene las autorizaciones de medicamentos vigentes (estadotra = 9) de un afiliado (titular o familiar). Realiza UNION entre llx_medica y llx_medica_familiar.",
+          "Obtiene autorizaciones vigentes de medicamentos y prácticas de un afiliado (titular o familiar). UNION ALL entre llx_medica, llx_medica_familiar, llx_autorizacion_prestacion y llx_autorizacion_prestacion_familiar. Incluye campo tipo: 'medicamento' | 'prestacion'.",
         tags: ["Autorizaciones"],
         security: [{ apiKeyAuth: [] }],
         querystring: {
@@ -54,7 +57,7 @@ export default async function autorizacionesRoute(fastify: FastifyInstance) {
             },
             monodroga: {
               type: "string",
-              description: "Filtrar por nombre de monodroga (contiene)",
+              description: "Filtrar por nombre de medicamento o práctica (contiene)",
               example: "METFORMINA",
             },
             desde: {
@@ -95,26 +98,41 @@ export default async function autorizacionesRoute(fastify: FastifyInstance) {
         return reply.code(400).send({ error: "cuil es obligatorio y debe tener 11 digitos numericos" });
       }
 
-      const filterClauses: string[] = [];
-      const filterParams: any[] = [];
+      const medFilterClauses: string[] = [];
+      const medFilterParams: any[] = [];
+      const pracFilterClauses: string[] = [];
+      const pracFilterParams: any[] = [];
 
       if (monodroga) {
-        filterClauses.push(`act.Monodroga LIKE ?`);
-        filterParams.push(`%${monodroga}%`);
+        medFilterClauses.push(`act.Monodroga LIKE ?`);
+        medFilterParams.push(`%${monodroga}%`);
+        pracFilterClauses.push(`pr.nombreprestacion LIKE ?`);
+        pracFilterParams.push(`%${monodroga}%`);
       }
 
       if (desde) {
-        filterClauses.push(`m.fecharecep >= ?`);
-        filterParams.push(desde);
+        medFilterClauses.push(`m.fecharecep >= ?`);
+        medFilterParams.push(desde);
+        pracFilterClauses.push(`p.fecharecep >= ?`);
+        pracFilterParams.push(desde);
       }
 
       if (hasta) {
-        filterClauses.push(`m.fecharecep <= ?`);
-        filterParams.push(hasta);
+        medFilterClauses.push(`m.fecharecep <= ?`);
+        medFilterParams.push(hasta);
+        pracFilterClauses.push(`p.fecharecep <= ?`);
+        pracFilterParams.push(hasta);
       }
 
-      const filterSql = filterClauses.length > 0 ? ` AND ${filterClauses.join(" AND ")}` : "";
-      const params = [cuil, ...filterParams, cuil, ...filterParams];
+      const medFilterSql = medFilterClauses.length > 0 ? ` AND ${medFilterClauses.join(" AND ")}` : "";
+      const pracFilterSql = pracFilterClauses.length > 0 ? ` AND ${pracFilterClauses.join(" AND ")}` : "";
+
+      const params = [
+        cuil, ...medFilterParams,
+        cuil, ...medFilterParams,
+        cuil, ...pracFilterParams,
+        cuil, ...pracFilterParams,
+      ];
 
       const sql = `
         SELECT 
@@ -128,7 +146,10 @@ export default async function autorizacionesRoute(fastify: FastifyInstance) {
           LPAD(act.UnidadPotencia, 5, '0') AS unidadpotencia,
           LPAD(act.Unidad, 4, '0') AS unidades,
           LPAD(rpc.label, 2, '0') AS cantidad,
-          SUBSTRING(rp.label,1,length(rp.label)-1) AS idporcentaje
+          SUBSTRING(rp.label,1,length(rp.label)-1) AS idporcentaje,
+          'medicamento' AS tipo,
+          '' AS medico,
+          '' AS matricula
         FROM llx_medica AS m
         LEFT JOIN llx_activia_vademecum AS act ON (m.medicamento = act.rowid)
         LEFT JOIN llx_rp AS rp ON (m.tipoautoRp1 = rp.rowid)
@@ -139,22 +160,25 @@ export default async function autorizacionesRoute(fastify: FastifyInstance) {
           AND m.tipoautoRp1 IS NOT NULL AND m.tipoautoRp1 != ''
           AND m.cantrp1 IS NOT NULL AND m.cantrp1 != ''
           AND m.cuilbenefi = ?
-          ${filterSql}
+          ${medFilterSql}
 
-        UNION
+        UNION ALL
 
         SELECT 
           m.rowid AS numeroautorizacion,
           m.cuilbenefi AS nroafiliado,
           DATE_FORMAT(m.fecharecep, '%Y-%m-%d') AS fecha,
           ADDDATE(DATE_FORMAT(m.fecharecep, '%Y-%m-%d'), INTERVAL 15 DAY) AS fechavencimiento,
-          act.Monodroga AS monodroga,
           LPAD(act.CodigoMonodroga, 5, '0') AS codmonodroga,
+          act.Monodroga AS monodroga,
           act.Potencia AS potencia,
           LPAD(act.UnidadPotencia, 5, '0') AS unidadpotencia,
           LPAD(act.Unidad, 4, '0') AS unidades,
           LPAD(rpc.label, 2, '0') AS cantidad,
-          SUBSTRING(rp.label,1,length(rp.label)-1) AS idporcentaje
+          SUBSTRING(rp.label,1,length(rp.label)-1) AS idporcentaje,
+          'medicamento' AS tipo,
+          '' AS medico,
+          '' AS matricula
         FROM llx_medica_familiar AS m
         LEFT JOIN llx_activia_vademecum AS act ON (m.medicamento = act.rowid)
         LEFT JOIN llx_rp AS rp ON (m.tipoautoRp1 = rp.rowid)
@@ -165,7 +189,57 @@ export default async function autorizacionesRoute(fastify: FastifyInstance) {
           AND m.tipoautoRp1 IS NOT NULL AND m.tipoautoRp1 != ''
           AND m.cantrp1 IS NOT NULL AND m.cantrp1 != ''
           AND m.cuilbenefi = ?
-          ${filterSql}
+          ${medFilterSql}
+
+        UNION ALL
+
+        SELECT 
+          p.id AS numeroautorizacion,
+          COALESCE(p.cuilbenefi, p.cuiltitu) AS nroafiliado,
+          COALESCE(NULLIF(DATE_FORMAT(p.fecharecep, '%Y-%m-%d'), '0000-00-00'), '') AS fecha,
+          COALESCE(NULLIF(DATE_FORMAT(DATE_ADD(p.fecharecep, INTERVAL 15 DAY), '%Y-%m-%d'), '0000-00-00'), '') AS fechavencimiento,
+          CONVERT(COALESCE(pr.codprestacion, '') USING utf8mb4) AS codmonodroga,
+          CONVERT(COALESCE(pr.nombreprestacion, '') USING utf8mb4) AS monodroga,
+          CONVERT('' USING utf8mb4) AS potencia,
+          CONVERT('' USING utf8mb4) AS unidadpotencia,
+          CONVERT('' USING utf8mb4) AS unidades,
+          CONVERT('' USING utf8mb4) AS cantidad,
+          CONVERT(CASE WHEN p.coseguro IS NOT NULL THEN CAST(p.coseguro AS CHAR(10)) ELSE '' END USING utf8mb4) AS idporcentaje,
+          CONVERT('prestacion' USING utf8mb4) AS tipo,
+          CONVERT(COALESCE(p.medico, '') USING utf8mb4) AS medico,
+          CONVERT(COALESCE(p.matricula, '') USING utf8mb4) AS matricula
+        FROM llx_autorizacion_prestacion AS p
+        LEFT JOIN llx_autorizacion_prestacion_lineas AS pl ON (p.id = pl.autorizacion)
+        LEFT JOIN llx_prestacion AS pr ON (pl.prestacion = pr.rowid)
+        WHERE (p.estadotra IS NULL OR p.estadotra NOT IN (0))
+          AND p.cuilbenefi = ?
+          ${pracFilterSql}
+
+        UNION ALL
+
+        SELECT 
+          p.rowid AS numeroautorizacion,
+          COALESCE(p.cuilbenefi, p.cuiltitu) AS nroafiliado,
+          COALESCE(NULLIF(DATE_FORMAT(p.fecharecep, '%Y-%m-%d'), '0000-00-00'), '') AS fecha,
+          COALESCE(NULLIF(DATE_FORMAT(DATE_ADD(p.fecharecep, INTERVAL 15 DAY), '%Y-%m-%d'), '0000-00-00'), '') AS fechavencimiento,
+          CONVERT(COALESCE(pr.codprestacion, '') USING utf8mb4) AS codmonodroga,
+          CONVERT(COALESCE(pr.nombreprestacion, '') USING utf8mb4) AS monodroga,
+          CONVERT('' USING utf8mb4) AS potencia,
+          CONVERT('' USING utf8mb4) AS unidadpotencia,
+          CONVERT('' USING utf8mb4) AS unidades,
+          CONVERT('' USING utf8mb4) AS cantidad,
+          CONVERT(CASE WHEN p.coseguro IS NOT NULL THEN CAST(p.coseguro AS CHAR(10)) ELSE '' END USING utf8mb4) AS idporcentaje,
+          CONVERT('prestacion' USING utf8mb4) AS tipo,
+          CONVERT(COALESCE(p.medico, '') USING utf8mb4) AS medico,
+          CONVERT(COALESCE(p.matricula, '') USING utf8mb4) AS matricula
+        FROM llx_autorizacion_prestacion_familiar AS p
+        LEFT JOIN llx_autorizacion_prestacion_familiar_lineas AS pl ON (p.rowid = pl.autorizacion)
+        LEFT JOIN llx_prestacion AS pr ON (pl.prestacion = pr.rowid)
+        WHERE (p.estadotra IS NULL OR p.estadotra NOT IN (0))
+          AND p.cuilbenefi = ?
+          ${pracFilterSql}
+
+        ORDER BY fecha DESC
       `;
 
       const result = await fastify.prisma.$queryRawUnsafe(sql, ...params) as any[];
