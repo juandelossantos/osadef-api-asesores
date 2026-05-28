@@ -9,38 +9,13 @@
 
 ## 2. System Prompt
 
-Copiar y pegar exactamente este prompt:
+Copiar el contenido de `docs/system-prompt.txt` del repositorio.
 
-```
-Eres un asistente virtual de OSADEF (Obra Social de Defensores) especializado en ayudar a los asesores de afiliados.
+## 3. Habilitar Markdown en el Widget
 
-Tu función es responder consultas sobre:
-1. Autorizaciones de medicamentos vigentes
-2. Tratamientos crónicos (patologías y medicamentos en tratamiento prolongado)
-3. Validación de afiliados (verificar si un CUIL existe en el sistema)
+En la pestaña **"Widget"** del agente, activar `renderMarkdown: true`. Esto permite que el chat renderice **negrita**, listas con viñetas, y saltos de línea correctamente. Sin esta opción, el texto `**negrita**` se ve literal con asteriscos.
 
-REGLAS IMPORTANTES:
-- Siempre debes pedir el CUIL del afiliado (11 dígitos numéricos sin guiones) antes de consultar datos.
-- El CUIL es obligatorio para todas las consultas.
-- Cuando muestres datos médicos, se claro y organizado. Usa listas o tablas cuando sea posible.
-- NO inventes información. Si no encuentras datos, indica claramente que no hay registros.
-- Para autorizaciones: muestra monodroga, fecha, vencimiento y cobertura.
-- Para cronicidad: muestra patología, monodroga, dosis, y fecha de vencimiento del tratamiento.
-- Si el asesor no especifica qué quiere consultar, pregúntale amablemente si busca autorizaciones o tratamientos crónicos.
-- Mantén un tono profesional, cordial y directo.
-
-EJEMPLOS DE INTERACCIÓN:
-Usuario: "Quiero ver las autorizaciones del afiliado 20120667468"
-→ Llama a la tool `consultar_datos_asesores` con action="autorizaciones" y cuil="20120667468"
-
-Usuario: "¿Qué cronicidades tiene este afiliado?"
-→ Pregunta: "Por favor, indícame el CUIL del afiliado para consultar sus tratamientos crónicos."
-
-Usuario: "Validar afiliado 20120667468"
-→ Llama a la tool con action="exists" y cuil="20120667468"
-```
-
-## 3. Configurar Tool (External API)
+## 4. Configurar Tool (External API)
 
 En la pestaña **"Tools"** del agente, agregar un nuevo tool:
 
@@ -79,9 +54,9 @@ https://api.osadef.org.ar/webhook/asesores-chat
       "type": "string",
       "description": "CUIL del afiliado o familiar. Debe tener exactamente 11 dígitos numéricos sin guiones ni puntos. Ejemplo: 20120667468"
     },
-    "monodroga": {
+    "nombre": {
       "type": "string",
-      "description": "Opcional. Nombre del medicamento o principio activo para filtrar resultados. Ejemplo: METFORMINA"
+      "description": "Opcional. Nombre del medicamento o práctica para filtrar resultados. Busca en ambos tipos. Ejemplo: resonancia, atorvastatina"
     },
     "desde": {
       "type": "string",
@@ -100,7 +75,7 @@ https://api.osadef.org.ar/webhook/asesores-chat
 }
 ```
 
-## 4. Configurar el Widget (Chat Interface)
+## 5. Configurar el Widget (Chat Interface)
 
 En la pestaña **"Widget"** o **"Deploy"** del agente:
 
@@ -115,7 +90,7 @@ En la pestaña **"Widget"** o **"Deploy"** del agente:
 - Position: `bottom-right`
 - Icon: chat bubble
 
-## 5. Obtener el Script de Embed
+## 6. Obtener el Script de Embed
 
 Una vez configurado el agente, ElevenLabs generará un script como este:
 
@@ -129,7 +104,7 @@ Una vez configurado el agente, ElevenLabs generará un script como este:
 
 Guardar el `agent-id` para el paso 6.
 
-## 6. Integrar en el Portal de Asesores
+## 7. Integrar en el Portal de Asesores
 
 El webmaster debe agregar este script en el HTML del portal de asesores (ej: en el footer o layout principal):
 
@@ -149,7 +124,7 @@ El webmaster debe agregar este script en el HTML del portal de asesores (ej: en 
 
 **Importante**: Reemplazar `AGENT_ID_AQUI` con el agent-id real generado en ElevenLabs.
 
-## 7. Importar Workflow en n8n
+## 8. Importar Workflow en n8n
 
 1. Ir a la UI de n8n (https://n8np.osadef.org.ar/)
 2. Workflows → Import from File
@@ -157,7 +132,7 @@ El webmaster debe agregar este script en el HTML del portal de asesores (ej: en 
 4. Guardar y **Activar** el workflow (toggle ON)
 5. Verificar que el webhook esté registrado: `https://api.osadef.org.ar/webhook/asesores-chat`
 
-## 8. Prueba End-to-End
+## 9. Prueba End-to-End
 
 ```bash
 # Probar el webhook de n8n directamente
