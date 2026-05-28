@@ -34,10 +34,10 @@
           "constant_value": ""
         },
         {
-          "id": "monodroga",
-          "name": "monodroga",
+          "id": "nombre",
+          "name": "nombre",
           "type": "string",
-          "description": "Opcional. Nombre del medicamento o principio activo para filtrar resultados. Ejemplo: METFORMINA",
+          "description": "Opcional. Nombre del medicamento o práctica para filtrar resultados. Ejemplo: METFORMINA, cardiologia, resonancia",
           "required": false,
           "value_type": "llm_prompt",
           "dynamic_variable": "",

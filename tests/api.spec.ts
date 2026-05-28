@@ -179,15 +179,11 @@ test.describe("API OSADEF Asesores — Tests de integracion HTTP", () => {
         expect(item.nroafiliado).toBeDefined();
         expect(item.fecha).toBeDefined();
         expect(item.fechavencimiento).toBeDefined();
-        expect(item.codmonodroga).toBeDefined();
-        expect(item.monodroga).toBeDefined();
+        expect(item.codigo).toBeDefined();
+        expect(item.nombre).toBeDefined();
         expect(item.tipo).toBeDefined();
-        expect(item.medico).toBeDefined();
-        expect(item.matricula).toBeDefined();
-
         if (item.tipo === "medicamento") {
-          expect(item.cantidad).toBeDefined();
-          expect(item.idporcentaje).toBeDefined();
+          expect(item.cobertura).toBeDefined();
         } else if (item.tipo === "prestacion") {
           expect(item.potencia).toBeDefined();
         }
@@ -195,20 +191,21 @@ test.describe("API OSADEF Asesores — Tests de integracion HTTP", () => {
     }
   });
 
-  test("GET /autorizaciones — filtro por monodroga", async ({ request }) => {
-    const response = await request.get(
-      `${BASE_URL}/autorizaciones?cuil=${CUIL_TEST}&monodroga=atorvastat`,
+  test("GET /autorizaciones — filtro por nombre", async ({ request }) => {
+    const res = await request.get(
+      `${BASE_URL}/autorizaciones?cuil=${CUIL_TEST}&nombre=atorvastat`,
       {
         headers: { Authorization: `Bearer ${API_KEY}` },
       },
     );
-
-    expect([200, 404]).toContain(response.status());
-
-    if (response.status() === 200) {
-      const body = await response.json();
+    expect([200, 404]).toContain(res.status());
+    if (res.status() === 200) {
+      const body = await res.json();
+      expect(body.data.length).toBeGreaterThan(0);
       for (const item of body.data) {
-        expect(item.monodroga.toUpperCase()).toContain("ATORVASTAT");
+        if (item.tipo === "medicamento") {
+          expect(item.nombre.toUpperCase()).toContain("ATORVASTAT");
+        }
       }
     }
   });

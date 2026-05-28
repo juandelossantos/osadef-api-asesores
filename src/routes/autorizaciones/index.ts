@@ -3,6 +3,7 @@ import { authGuard } from "../../middleware/auth-guard.js";
 
 interface AutorizacionesQuery {
   cuil: string;
+  nombre?: string;
   monodroga?: string;
   desde?: string;
   hasta?: string;
@@ -15,13 +16,13 @@ const autorizacionItemSchema = {
     nroafiliado: { type: "string", example: "20120667468" },
     fecha: { type: "string", example: "2025-01-15" },
     fechavencimiento: { type: "string", example: "2025-01-30" },
-    codmonodroga: { type: "string", example: "00042" },
-    monodroga: { type: "string", example: "METFORMINA" },
+    codigo: { type: "string", example: "00042" },
+    nombre: { type: "string", example: "METFORMINA" },
     potencia: { type: "string", example: "500" },
     unidadpotencia: { type: "string", example: "00001" },
     unidades: { type: "string", example: "0030" },
     cantidad: { type: "string", example: "02" },
-    idporcentaje: { type: "string", example: "40" },
+    cobertura: { type: "string", example: "40" },
     tipo: { type: "string", example: "medicamento" },
     medico: { type: "string", example: "" },
     matricula: { type: "string", example: "" },
@@ -55,9 +56,14 @@ export default async function autorizacionesRoute(fastify: FastifyInstance) {
               description: "CUIL del afiliado o familiar (sin guiones)",
               example: "20120667468",
             },
+            nombre: {
+              type: "string",
+              description: "Filtrar por nombre de medicamento o práctica (contiene). Reemplaza a monodroga.",
+              example: "METFORMINA",
+            },
             monodroga: {
               type: "string",
-              description: "Filtrar por nombre de medicamento o práctica (contiene)",
+              description: "[Deprecated] Usar nombre en su lugar",
               example: "METFORMINA",
             },
             desde: {
@@ -92,7 +98,8 @@ export default async function autorizacionesRoute(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { cuil, monodroga, desde, hasta } = request.query;
+      const { cuil, nombre, monodroga, desde, hasta } = request.query;
+      const filtro = nombre || monodroga;
 
       if (!cuil || !/^\d{11}$/.test(cuil)) {
         return reply.code(400).send({ error: "cuil es obligatorio y debe tener 11 digitos numericos" });
@@ -103,11 +110,11 @@ export default async function autorizacionesRoute(fastify: FastifyInstance) {
       const pracFilterClauses: string[] = [];
       const pracFilterParams: any[] = [];
 
-      if (monodroga) {
+      if (filtro) {
         medFilterClauses.push(`act.Monodroga LIKE ?`);
-        medFilterParams.push(`%${monodroga}%`);
+        medFilterParams.push(`%${filtro}%`);
         pracFilterClauses.push(`pr.nombreprestacion LIKE ?`);
-        pracFilterParams.push(`%${monodroga}%`);
+        pracFilterParams.push(`%${filtro}%`);
       }
 
       if (desde) {
@@ -140,13 +147,13 @@ export default async function autorizacionesRoute(fastify: FastifyInstance) {
           m.cuiltitu AS nroafiliado,
           DATE_FORMAT(m.fecharecep, '%Y-%m-%d') AS fecha,
           ADDDATE(DATE_FORMAT(m.fecharecep, '%Y-%m-%d'), INTERVAL 15 DAY) AS fechavencimiento,
-          LPAD(act.CodigoMonodroga, 5, '0') AS codmonodroga,
-          act.Monodroga AS monodroga,
+          LPAD(act.CodigoMonodroga, 5, '0') AS codigo,
+          act.Monodroga AS nombre,
           act.Potencia AS potencia,
           LPAD(act.UnidadPotencia, 5, '0') AS unidadpotencia,
           LPAD(act.Unidad, 4, '0') AS unidades,
           LPAD(rpc.label, 2, '0') AS cantidad,
-          SUBSTRING(rp.label,1,length(rp.label)-1) AS idporcentaje,
+          SUBSTRING(rp.label,1,length(rp.label)-1) AS cobertura,
           'medicamento' AS tipo,
           '' AS medico,
           '' AS matricula
@@ -169,13 +176,13 @@ export default async function autorizacionesRoute(fastify: FastifyInstance) {
           m.cuilbenefi AS nroafiliado,
           DATE_FORMAT(m.fecharecep, '%Y-%m-%d') AS fecha,
           ADDDATE(DATE_FORMAT(m.fecharecep, '%Y-%m-%d'), INTERVAL 15 DAY) AS fechavencimiento,
-          LPAD(act.CodigoMonodroga, 5, '0') AS codmonodroga,
-          act.Monodroga AS monodroga,
+          LPAD(act.CodigoMonodroga, 5, '0') AS codigo,
+          act.Monodroga AS nombre,
           act.Potencia AS potencia,
           LPAD(act.UnidadPotencia, 5, '0') AS unidadpotencia,
           LPAD(act.Unidad, 4, '0') AS unidades,
           LPAD(rpc.label, 2, '0') AS cantidad,
-          SUBSTRING(rp.label,1,length(rp.label)-1) AS idporcentaje,
+          SUBSTRING(rp.label,1,length(rp.label)-1) AS cobertura,
           'medicamento' AS tipo,
           '' AS medico,
           '' AS matricula
@@ -198,13 +205,13 @@ export default async function autorizacionesRoute(fastify: FastifyInstance) {
           COALESCE(p.cuilbenefi, p.cuiltitu) AS nroafiliado,
           COALESCE(NULLIF(DATE_FORMAT(p.fecharecep, '%Y-%m-%d'), '0000-00-00'), '') AS fecha,
           COALESCE(NULLIF(DATE_FORMAT(DATE_ADD(p.fecharecep, INTERVAL 15 DAY), '%Y-%m-%d'), '0000-00-00'), '') AS fechavencimiento,
-          CONVERT(COALESCE(pr.codprestacion, '') USING utf8mb4) AS codmonodroga,
-          CONVERT(COALESCE(pr.nombreprestacion, '') USING utf8mb4) AS monodroga,
+          CONVERT(COALESCE(pr.codprestacion, '') USING utf8mb4) AS codigo,
+          CONVERT(COALESCE(pr.nombreprestacion, '') USING utf8mb4) AS nombre,
           CONVERT('' USING utf8mb4) AS potencia,
           CONVERT('' USING utf8mb4) AS unidadpotencia,
           CONVERT('' USING utf8mb4) AS unidades,
           CONVERT('' USING utf8mb4) AS cantidad,
-          CONVERT(CASE WHEN p.coseguro IS NOT NULL THEN CAST(p.coseguro AS CHAR(10)) ELSE '' END USING utf8mb4) AS idporcentaje,
+          CONVERT(CASE WHEN p.coseguro IS NOT NULL THEN CAST(p.coseguro AS CHAR(10)) ELSE '' END USING utf8mb4) AS cobertura,
           CONVERT('prestacion' USING utf8mb4) AS tipo,
           CONVERT(COALESCE(p.medico, '') USING utf8mb4) AS medico,
           CONVERT(COALESCE(p.matricula, '') USING utf8mb4) AS matricula
@@ -222,13 +229,13 @@ export default async function autorizacionesRoute(fastify: FastifyInstance) {
           COALESCE(p.cuilbenefi, p.cuiltitu) AS nroafiliado,
           COALESCE(NULLIF(DATE_FORMAT(p.fecharecep, '%Y-%m-%d'), '0000-00-00'), '') AS fecha,
           COALESCE(NULLIF(DATE_FORMAT(DATE_ADD(p.fecharecep, INTERVAL 15 DAY), '%Y-%m-%d'), '0000-00-00'), '') AS fechavencimiento,
-          CONVERT(COALESCE(pr.codprestacion, '') USING utf8mb4) AS codmonodroga,
-          CONVERT(COALESCE(pr.nombreprestacion, '') USING utf8mb4) AS monodroga,
+          CONVERT(COALESCE(pr.codprestacion, '') USING utf8mb4) AS codigo,
+          CONVERT(COALESCE(pr.nombreprestacion, '') USING utf8mb4) AS nombre,
           CONVERT('' USING utf8mb4) AS potencia,
           CONVERT('' USING utf8mb4) AS unidadpotencia,
           CONVERT('' USING utf8mb4) AS unidades,
           CONVERT('' USING utf8mb4) AS cantidad,
-          CONVERT(CASE WHEN p.coseguro IS NOT NULL THEN CAST(p.coseguro AS CHAR(10)) ELSE '' END USING utf8mb4) AS idporcentaje,
+          CONVERT(CASE WHEN p.coseguro IS NOT NULL THEN CAST(p.coseguro AS CHAR(10)) ELSE '' END USING utf8mb4) AS cobertura,
           CONVERT('prestacion' USING utf8mb4) AS tipo,
           CONVERT(COALESCE(p.medico, '') USING utf8mb4) AS medico,
           CONVERT(COALESCE(p.matricula, '') USING utf8mb4) AS matricula
