@@ -68,7 +68,6 @@ export default async function afiliadosExistsRoute(fastify: FastifyInstance) {
                 nullable: true,
                 properties: {
                   apellido: { type: "string" },
-                  nombre: { type: "string" },
                   sexo: { type: "string" },
                   activo: { type: "boolean" },
                   plan: { type: "string" },
@@ -82,7 +81,7 @@ export default async function afiliadosExistsRoute(fastify: FastifyInstance) {
                   certificado: { type: "string", nullable: true },
                   diagnostico: { type: "string", nullable: true },
                   vencimiento: { type: "string", nullable: true },
-                  estado: { type: "string", example: "Vigente" },
+                  estado: { type: "string", nullable: true, example: "Vigente" },
                 },
               },
             },
@@ -110,7 +109,6 @@ export default async function afiliadosExistsRoute(fastify: FastifyInstance) {
           rowid: true,
           ...(wantBasico && {
             apellido: true,
-            nombre: true,
             sexo: true,
             activo: true,
             plan: true,
@@ -130,7 +128,6 @@ export default async function afiliadosExistsRoute(fastify: FastifyInstance) {
         if (wantBasico) {
           response.afiliado = {
             apellido: titular.apellido,
-            nombre: titular.nombre,
             sexo: titular.sexo,
             activo: titular.activo === 1,
             plan: titular.plan,
