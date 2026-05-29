@@ -1,16 +1,68 @@
 # AGENTS.md — osadef-api-asesores
 
-## Reglas criticas
+## Project Goal
+API for advisors (asesores) to query medical data (autorizaciones, cronicidad) from a legacy MySQL DB, consumed by n8n → ElevenLabs Conversational AI widget embedded in the advisors portal.
 
-- **NUNCA ejecutar `prisma migrate`** — la BD es legacy y compartida con el portal y osadef-api. Solo `prisma generate` y `prisma db pull`.
-- **NUNCA modificar la BD directamente** sin verificar que otros sistemas no dependan de la misma tabla/columna.
-- **`API_KEY_N8N_ASESORES` es usada por n8n** en los workflows del chat de asesores. Si se cambia, hay que actualizar la credencial en n8n inmediatamente.
-- **Esta API maneja datos de salud** (autorizaciones medicas, diagnosticos de cronicidad). Aplicar las reglas de sanitizacion de logs estrictamente.
-- **NO implementar endpoints de escritura** (POST/PUT/DELETE que modifiquen datos). Esta API es SOLO LECTURA.
+## Stack
+Fastify + Prisma + TypeScript strict + Playwright tests + PM2 on port 3003.
 
-## Despliegue
+## Current State (May 28, 2026)
 
-### Proceso completo
+### Endpoints
+| Endpoint | Description |
+|---|---|
+| `GET /health` | Health check (no auth) |
+| `GET /autorizaciones?cuil=&nombre=&desde=&hasta=` | Unified: meds + practices via UNION ALL |
+| `GET /cronicidad?cuil=&monodroga=&vence_en_dias=` | Chronic treatments (meds only) |
+| `GET /afiliados/exists?cuil=` | Check if CUIL exists |
+
+### Key Design Decisions
+- **Unified `/autorizaciones`**: UNION ALL of `llx_medica`, `llx_medica_familiar`, `llx_autorizacion_prestacion`, `llx_autorizacion_prestacion_familiar`. Returns `tipo: "medicamento"|"prestacion"` discriminator.
+- **Field names**: `codigo` (was codmonodroga), `nombre` (was monodroga), `cobertura` (was idporcentaje).
+- **CONVERT(... USING utf8mb4)** on practice columns fixes collation mismatch for UNION.
+- **estadotra NOT IN (0)** for practices (vs =9 for medications).
+- n8n Format Response separates meds/practicas by `tipo`. Agent LLM filters by `tipo` based on user query.
+
+### Data
+- `27248817939`: 5 meds + 197 practices (best for practice testing)
+- `20120667468`: 6 meds + 0 practices
+- `27290758187`: 92 meds + many practices + 22 chronic
+
+### System Prompt (`docs/system-prompt.txt`)
+Built following ElevenLabs prompting guide best practices:
+- `# Personality`, `# Goal`, `# Tone`, `# Tools`, `# Guardrails`, `# Examples` sections
+- Practice classification: `[Laboratorio]`, `[Imágenes]`, `[Consulta]`, `[Procedimiento]`, `[Kinesiología]`
+- Pagination: show first 5 when >10 results, ask for more
+- Filtering: only show what user asked for (meds vs practices)
+- Bullet lists enforced for multi-item responses
+- "This step is important" emphasis on critical rules
+- Error handling for tool failures
+
+### ElevenLabs Agent
+- renderMarkdown: true must be enabled in Widget settings for markdown to render
+- System prompt in `docs/system-prompt.txt` (paste into ElevenLabs dashboard)
+- Tool config in `docs/elevenlabs-tool-config.json` (parameter `nombre`, not `monodroga`)
+
+### n8n
+- Workflow export: `n8n-workflow.json` (must be re-imported after changes)
+- Webhook: `/webhook/asesores-chat`
+- Nodes: Webhook → Parse Intent → API Request → Format Response → Responder
+- Format Response uses `item.nombre`, `item.codigo`, `item.cobertura`
+
+### Git
+- Remote: `https://github.com/juandelossantos/osadef-api-asesores.git`
+- Push works via `git config credential.helper store` (token stored)
+- Latest commit: `b262806`
+
+## Critical Rules
+
+- **NUNCA ejecutar `prisma migrate`** — BD es legacy y compartida. Solo `prisma generate` y `prisma db pull`.
+- **NUNCA modificar la BD** sin verificar dependencias de otros sistemas.
+- **NO implementar endpoints de escritura** (POST/PUT/DELETE). SOLO LECTURA.
+- **Sanitizar logs**: nunca loguear CUILs ni diagnósticos en producción.
+- **Siempre usar `?` placeholders** en `$queryRawUnsafe`. NUNCA concatenar strings.
+
+## Deployment
 ```bash
 cd /home/osadef-api-asesores
 git pull
@@ -20,201 +72,39 @@ npm run build
 pm2 restart osadef-api-asesores
 ```
 
-### Verificacion post-deploy
+### Verification
 ```bash
 curl -s http://127.0.0.1:3003/health
-# {"status":"ok",...}
-```
-
-### Logs
-```bash
-pm2 logs osadef-api-asesores
-# o
-tail -f /home/osadef-api-asesores/logs/output.log
-tail -f /home/osadef-api-asesores/logs/error.log
 ```
 
 ### PM2
 ```bash
-pm2 status                       # ver estado
-pm2 restart osadef-api-asesores  # reiniciar
-pm2 stop osadef-api-asesores     # detener
-pm2 start osadef-api-asesores    # iniciar
+pm2 status | restart | stop | start osadef-api-asesores
 ```
+Config: `ecosystem.config.cjs` (autorestart, max 10 restarts, production mode).
 
-La config esta en `ecosystem.config.cjs` (auto-restart, max 10 restarts).
+## Server Ecosystem
+| Service | Port | Type |
+|---|---|---|
+| osadef-portal-prestadores | 3000 | Docker |
+| osadef-api | 3001 | PM2 (prestadores API) |
+| mcp-osadef | 3002 | systemd |
+| **osadef-api-asesores** | **3003** | **PM2** |
+| n8n | 5678 | Docker |
 
-## Dependencias con otros servicios
+## Architecture Flow
+Portal (asesor) → ElevenLabs widget → tool webhook → n8n → osadef-api-asesores → MySQL
 
-### n8n (puerto 5678)
-- n8n llama a esta API usando `API_KEY_N8N_ASESORES` + `?cuil=` en cada request.
-- Si la API se cae, los webhooks de n8n devuelven error, y el chat de IA para asesores deja de funcionar.
-- La API es **solo lectura** para n8n (GET endpoints).
-- El flujo es: Portal (asesor logueado) → Chat → n8n webhook → esta API.
+## Prisma UNION Bug
+Complex UNION with aggregates fails through Prisma connector. `/autorizaciones` uses UNION ALL (no aggregates) so it works. `/cronicidad` splits UNION into two `$queryRaw` calls merged in JS.
 
-### osadef-api (puerto 3001)
-- No se comunican directamente. Son dos APIs distintas con distintas API Keys.
-- Ambas leen de la misma BD MySQL pero tablas diferentes (prestadores vs medicamentos/afiliados).
+## Known Issues
+- `health.environment` test expects "development" but PM2 runs "production" (pre-existing)
+- ElevenLabs quota may be exhausted (needs plan upgrade)
+- Widget embed ready but not deployed to portal (waiting for webmaster)
 
-### osadef-portal-prestadores (puerto 3000)
-- **Comparten la misma BD MySQL**. El portal lee/escribe tablas de afiliados.
-- Esta API solo lee (GET) de `llx_medica`, `llx_afiliado`, etc.
-
-### Nginx
-- `https://asesores-api.osadef.org.ar` → `127.0.0.1:3003` (configurar cuando este listo)
-- Tambien proxea `/webhook/` → `127.0.0.1:5678` (n8n)
-- Config: `/etc/nginx/sites-available/api-osadef` (agregar location)
-
-## Modelo de autenticacion
-
-### API Key (unico metodo)
-- Clave estatica definida en `API_KEY_N8N_ASESORES` del `.env.production`
-- Header: `Authorization: Bearer <api_key>`
-- Acceso de lectura a todos los afiliados
-- Requiere `?cuil=` en cada request para identificar al afiliado/familiar
-- Header opcional de auditoria: `X-Asesor-ID: <id_del_asesor>`
-- Role: `"system"` (id=0)
-
-### Auth guard (middleware)
-- Verifica que el token sea exactamente `API_KEY_N8N_ASESORES`
-- Inyecta `request.authUser = { id: 0, role: "system" }`
-- No soporta JWT (los asesores ya estan autenticados en el portal)
-
-## Base de datos
-
-### Tablas usadas (10 de ~200+)
-
-| Tabla | Uso |
-|---|---|
-| `llx_medica` | Autorizaciones del titular |
-| `llx_medica_familiar` | Autorizaciones de familiares |
-| `llx_activia_vademecum` | Datos del medicamento (monodroga, potencia, etc.) |
-| `llx_rp` | Tipo de receta / porcentaje de cobertura |
-| `llx_rp_cantidad` | Cantidades autorizadas |
-| `llx_afiliado` | Datos del titular (validacion de existencia) |
-| `llx_familiar` | Datos del familiar (validacion de existencia) |
-| `llx_afiliado_antecedente` | Vinculo titular ↔ patologia (fechas) |
-| `llx_familiar_antecedente` | Vinculo familiar ↔ patologia (fechas) |
-| `llx_antecedente` | Nombre de la patologia/cronicidad |
-
-### Reglas
-- **NUNCA `prisma migrate`** — la BD es legacy y compartida
-- Solo `prisma generate` (generar client) y `prisma db pull` (sincronizar schema)
-- El schema es independiente del portal y de osadef-api
-
-## Convenciones de desarrollo
-
-### Metodologia: Planning antes de codigo
-1. **Entender el requerimiento** — leer la query SQL, identificar tablas, filtros, ordenamiento.
-2. **Escribir el test primero** — en `tests/api.spec.ts`, crear el caso de uso antes de implementar el endpoint.
-3. **Implementar el endpoint** — siguiendo el patron de osadef-api (schema OpenAPI inline, $queryRaw para queries complejas).
-4. **Ejecutar tests** — `npm test`. Si falla, arreglar.
-5. **Documentar en Swagger** — verificar que `/documentation` muestre el endpoint correctamente.
-
-### Codigo
-- TypeScript estricto (`strict: true`)
-- Imports con extension `.js` (requerido por NodeNext module resolution)
-- Plugins de Fastify envueltos con `fastify-plugin` (fp) para encapsulacion
-- Rutas como funciones async que reciben `FastifyInstance`
-- Validacion de input con JSON Schema nativo de Fastify
-- Raw SQL (`$queryRawUnsafe`) para queries complejas (UNION, GROUP BY, funciones SQL). Preferir Prisma client para queries simples (exists).
-- **SIEMPRE usar parametros** en `$queryRawUnsafe`. NUNCA concatenar strings de usuario directamente en SQL.
-
-### Sanitizacion de logs (CRITICO - datos de salud)
-- NUNCA loguear CUIL en produccion.
-- NUNCA loguear diagnosticos (nombre de antecedentes) o nombres de medicamentos en logs.
-- En desarrollo esta permitido para debugging, pero en produccion los logs deben estar sanitizados.
-- Configuracion de Pino en `src/index.ts`: en produccion usar `level: "warn"`.
-
-### Archivos de entorno
-- `.env.development` y `.env.production` NUNCA van al repo
-- `.env.example` es el template publico
-- La carga es automatica segun `NODE_ENV` (ver `src/config/env.ts`)
-- Variables requeridas: `DATABASE_URL`, `API_KEY_N8N_ASESORES`
-
-### Git
-- Branch principal: `main`
-- Remote: crear en GitHub cuando se inicie el repo
-
-### Scripts npm
-- `npm run dev` — desarrollo con hot reload (tsx watch)
-- `npm run build` — compilar TypeScript a `dist/`
-- `npm start` — ejecutar build compilado
-- `npm run start:dev` / `npm run start:prod` — con NODE_ENV explicito
-- `npm run prisma:generate` — regenerar Prisma client
-- `npm run prisma:pull` — sincronizar schema desde BD
-- `npm test` — ejecutar suite de Playwright
-
-## Riesgos conocidos
-
-### Datos de salud sensibles
-Esta API expone autorizaciones medicas y diagnosticos de cronicidad. En Argentina esto esta protegido por la Ley 25.326 de Proteccion de Datos Personales. Si la API Key se expone, cualquier sistema podria leer datos medicos de cualquier afiliado.
-
-### API Key estatica
-`API_KEY_N8N_ASESORES` es una clave estatica. No hay rotacion automatica. Si se expone, cambiar inmediatamente y actualizar n8n.
-
-### Sin rate limiting
-La API no tiene rate limiting propio. Depende de Nginx o de n8n para limitar requests.
-
-## Ecosistema del servidor
-
-| Servicio | Puerto | Tipo | Dependencia con esta API |
-|---|---|---|---|
-| osadef-portal-prestadores | 3000 | Docker | Comparte BD |
-| osadef-api | 3001 | PM2 | Misma BD, distinta API Key |
-| mcp-osadef | 3002 | systemd | No directa |
-| **osadef-api-asesores** | **3003** | **PM2** | **-** |
-| n8n | 5678 | Docker | Consume esta API |
-
-## Como funciona la integracion n8n ↔ API (paso a paso)
-
-### Flujo actual de osadef-api (prestadores)
-1. El prestador habla en el chat de voz/IA (CustomGPT + ElevenLabs).
-2. CustomGPT envia la pregunta a un webhook de n8n.
-3. n8n tiene un workflow que:
-   - Recibe el mensaje del usuario.
-   - Determina la intencion (facturas, pagos, debitos).
-   - Extrae el CUIT del prestador (del contexto de la conversacion).
-   - Llama a `osadef-api` (puerto 3001) con:
-     - Header: `Authorization: Bearer <API_KEY_N8N>`
-     - Query: `?cuit=30589663256`
-   - Recibe JSON de facturas/pagos/debitos.
-   - Formatea la respuesta en lenguaje natural.
-   - Devuelve al chat.
-
-### Flujo de osadef-api-asesores (ElevenLabs Conversational AI)
-1. El asesor esta logueado en el portal de asesores.
-2. En el portal hay un **widget de chat** de ElevenLabs Conversational AI (modo texto).
-3. El asesor escribe una consulta (ej: "Quiero ver las autorizaciones del afiliado 20120667468").
-4. ElevenLabs entiende la intencion y, si detecta que necesita datos, **llama a una tool** configurada:
-   - Tool: `consultar_datos_asesores`
-   - Webhook: `https://api.osadef.org.ar/webhook/asesores-chat`
-   - Body: `{ "action": "autorizaciones", "cuil": "20120667468" }`
-5. n8n recibe el POST en el webhook `asesores-chat`:
-   - Parsea la intencion y el CUIL.
-   - Determina el endpoint de la API: `/autorizaciones`, `/cronicidad` o `/afiliados/exists`.
-   - Llama a `osadef-api-asesores` (puerto 3003) con:
-     - Header: `Authorization: Bearer <API_KEY_N8N_ASESORES>`
-     - Query: `?cuil=20120667468`
-   - Recibe JSON de datos medicos.
-   - Devuelve el JSON crudo a ElevenLabs.
-6. ElevenLabs usa el JSON para generar una respuesta en lenguaje natural y la muestra en el widget.
-
-### Configuracion de ElevenLabs
-- Ver documento completo: `docs/elevenlabs-setup.md`
-- Workflow de n8n exportado: `n8n-workflow.json` (importar en n8n y activar)
-- Widget embeddable: script de ElevenLabs Conversational AI con `mode="chat"`
-
-### Por que es distinta la API Key?
-- `osadef-api` expone datos financieros (facturas, pagos) de prestadores.
-- `osadef-api-asesores` expone datos de salud (autorizaciones, diagnosticos) de afiliados.
-- Son dominios de datos completamente diferentes con distintos riesgos legales.
-- Si alguien compromete una key, no accede a ambos mundos.
-
-## Lecciones aprendidas (a aplicar)
-
-1. **Reiniciar la API con PM2 es seguro** — no afecta otros servicios. Pero n8n y el chat quedaran sin datos hasta que vuelva.
-2. **Siempre verificar `/health`** despues de reiniciar.
-3. **Los env vars se cargan segun NODE_ENV** — en produccion usa `.env.production`, no `.env`.
-4. **$queryRawUnsafe con parametros es seguro** — usar `?` placeholders, no concatenar strings.
-5. **Primero el test, luego el codigo** — Playwright detecta problemas de integracion reales.
+## Test Commands
+```bash
+npm test                          # Playwright tests
+NODE_ENV=development npm test     # Force dev mode
+```
