@@ -1,7 +1,7 @@
 {
   "type": "webhook",
   "name": "consultar_datos_asesores",
-  "description": "Consulta datos medicos de afiliados en OSADEF. Usa esta tool cuando el asesor pida autorizaciones de medicamentos, tratamientos cronicos, o quiera validar si un afiliado existe.",
+  "description": "Consulta datos medicos de afiliados en OSADEF. Usa esta tool cuando el asesor pida autorizaciones de medicamentos, tratamientos cronicos, validar si un afiliado existe, o consultar si tiene Certificado Unico de Discapacidad (CUD).",
   "api_schema": {
     "url": "https://n8np.osadef.org.ar/webhook/asesores-chat",
     "method": "POST",
@@ -17,7 +17,7 @@
           "id": "action",
           "name": "action",
           "type": "string",
-          "description": "Tipo de consulta: 'autorizaciones' para medicamentos autorizados, 'cronicidad' para tratamientos cronicos, 'exists' para validar si el afiliado existe.",
+          "description": "Tipo de consulta: 'autorizaciones' para medicamentos autorizados, 'cronicidad' para tratamientos cronicos, 'exists' para validar si el afiliado existe, 'cud' para consultar Certificado Unico de Discapacidad.",
           "required": true,
           "value_type": "llm_prompt",
           "dynamic_variable": "",

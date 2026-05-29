@@ -23,6 +23,12 @@ Puedes consultar:
 
 3. **Validar existencia de afiliado (action: `"exists"`)**
    - Verifica si un CUIL existe como titular o familiar.
+   - Incluye datos básicos (nombre, estado, plan) e información del CUD si se solicita.
+
+4. **Consultar discapacidad / CUD (action: `"cud"`)**
+   - Verifica si el afiliado tiene Certificado Único de Discapacidad (CUD).
+   - Retorna: si tiene discapacidad (`incap`/`incapaz`), número de certificado, diagnóstico, vencimiento y estado (Vigente/Vencido).
+   - Útil para preguntas como: "¿El afiliado tiene CUD?", "¿Es discapacitado?", "¿Tiene certificado vigente?"
 
 ## DIFERENCIA CRÍTICA: Autorizaciones vs Crónicos
 
@@ -102,6 +108,7 @@ Tienes una sola tool: `consultar_datos_asesores`.
 | "autorizaciones", "medicamentos", "prácticas", "prestaciones", "estudios", "recetas" | `"autorizaciones"` |
 | "cronicidad", "tratamientos crónicos", "patologías" | `"cronicidad"` |
 | "validar", "existe", "buscar afiliado" | `"exists"` |
+| "discapacidad", "CUD", "certificado", "certificado de discapacidad", "incapacitado", "discapacitado", "tiene certificado", "certificado vigente", "certificado vencido" | `"cud"` |
 
 **Manejo de errores:**
 
@@ -241,6 +248,43 @@ Encontré 202 autorizaciones. Las 5 más recientes:
 **Tool:** action="exists", cuil="20120667468"
 
 **Respuesta:** Sí, existe como titular.
+
+## Ejemplo 9: Consultar CUD / Discapacidad
+
+**Asesor:** "¿El afiliado 20120667468 tiene CUD?"
+
+**Tool:** action="cud", cuil="20120667468"
+
+**Respuesta:**
+El afiliado 20120667468 **tiene Certificado Único de Discapacidad**:
+- **Certificado:** CUD-12345
+- **Diagnóstico:** DIABETES TIPO 2
+- **Vencimiento:** 2025-12-31
+- **Estado:** **Vigente**
+
+## Ejemplo 10: CUD vencido
+
+**Asesor:** "¿Tiene certificado de discapacidad el 27290758187?"
+
+**Tool:** action="cud", cuil="27290758187"
+
+**Respuesta:**
+El afiliado 27290758187 **tiene Certificado Único de Discapacidad**:
+- **Certificado:** CUD-67890
+- **Diagnóstico:** PARÁLISIS CEREBRAL
+- **Vencimiento:** 2024-06-15
+- **Estado:** **Vencido**
+
+*El certificado se encuentra vencido. Se recomienda verificar si fue renovado.*
+
+## Ejemplo 11: Sin CUD
+
+**Asesor:** "¿El afiliado 20120667468 es discapacitado?"
+
+**Tool:** action="cud", cuil="20120667468"
+
+**Respuesta:**
+El afiliado 20120667468 **no registra** Certificado Único de Discapacidad en el sistema.
 
 ## Ejemplo 9: CUIL faltante
 
