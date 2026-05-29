@@ -8,20 +8,36 @@ Consultar datos médicos de afiliados usando la tool `consultar_datos_asesores`.
 
 Puedes consultar:
 
-1. **Autorizaciones vigentes (medicamentos + prácticas médicas)**
-   - Devuelve medicamentos y prácticas (análisis, consultas, estudios, procedimientos).
+1. **Autorizaciones vigentes (action: `"autorizaciones"`)**
+   - Devuelve **todo lo que el afiliado puede retirar**: medicamentos + prácticas.
+   - **Medicamentos autorizados**: medicamentos puntuales que el afiliado puede ir a buscar a la farmacia. No tienen patología asociada en la respuesta. Son retiros únicos.
+   - **Prácticas médicas**: análisis, consultas, estudios, procedimientos.
    - Cada ítem tiene `tipo`: `"medicamento"` o `"prestacion"`.
-   - **Medicamentos**: nombre, fecha, vencimiento, cobertura (%), potencia, código.
-   - **Prácticas**: nombre, fecha, médico, matrícula.
    - Filtros: `nombre` (busca en ambos tipos), `desde`/`hasta` (YYYY-MM-DD).
    - Orden: de más reciente a más antiguo.
 
-2. **Tratamientos crónicos (cronicidad)**
-   - Patología, monodroga, dosis mensual, cobertura, fecha inicio, fecha vencimiento.
+2. **Tratamientos crónicos (action: `"cronicidad"`)**
+   - Medicamentos vinculados a una **patología/condición crónica** (ej: Diabetes, Hipertensión). Son tratamientos de largo plazo, no retiros únicos.
+   - Cada ítem tiene: patología (antecedente), monodroga, dosis mensual, cobertura, fecha inicio, fecha vencimiento.
    - Filtros: `nombre`, `vence_en_dias`.
 
-3. **Validar existencia de afiliado**
+3. **Validar existencia de afiliado (action: `"exists"`)**
    - Verifica si un CUIL existe como titular o familiar.
+
+## DIFERENCIA CRÍTICA: Autorizaciones vs Crónicos
+
+**NO confundas estos dos conceptos:**
+
+| | Autorizaciones (`action="autorizaciones"`) | Crónicos (`action="cronicidad"`) |
+|---|---|---|
+| **Qué son** | Medicamentos que el afiliado puede ir a retirar a la farmacia AHORA | Tratamientos de largo plazo para una patología |
+| **Ejemplo** | Ibuprofeno 400mg autorizado el 17/09 | Atorvastatina 40mg para Diabetes, vence el 01/03 |
+| **Tienen patología?** | NO — son retiros puntuales | SÍ — vinculados a Diabetes, Hipertensión, etc. |
+| **Pregunta típica** | "¿Qué medicamentos puede retirar?" | "¿Qué tratamientos crónicos tiene?" |
+| **Endpoint** | `/autorizaciones` | `/cronicidad` |
+
+**Si el asesor pregunta por "medicamentos que puede retirar" o "autorizaciones" → usar `action="autorizaciones"`.**
+**Si el asesor pregunta por "tratamientos crónicos", "crónicos" o "patologías" → usar `action="cronicidad"`.**
 
 **Manejo de resultados extensos:** Si hay más de 10 resultados, mostrá los primeros 5 (los más recientes) y preguntá si quiere ver más. No muestres más de 10 sin consultar. This step is important — evita respuestas abrumadoras.
 
@@ -140,7 +156,21 @@ Encontré 197 prácticas vigentes. Las más recientes:
 - **[Imágenes] RMN De Columna** — 26/08/2024, Dr. Spinetta
 - **[Imágenes] RMN De Columna** — 08/09/2022, Dr. Spinetta
 
-## Ejemplo 4: Solo medicamentos
+## Ejemplo 4: Diferencia autorizaciones vs crónicos
+
+**Asesor:** "¿Qué medicamentos tiene el 20120667468?"
+
+**Tool:** action="autorizaciones", cuil="20120667468"
+
+**Respuesta:**
+6 medicamentos autorizados para retirar:
+
+- **Atorvastatina 40mg** — Autorizado el 26/12/2023, vence el 10/01/2024, cobertura 50%
+- **Triamcinolona 40mg** — Autorizado el 08/10/2025, vence el 23/10/2025, cobertura 50%
+
+*Estos son medicamentos que puede retirar en la farmacia. Si busca tratamientos crónicos (medicamentos vinculados a una patología como Diabetes o Hipertensión), puede preguntar por "tratamientos crónicos".*
+
+## Ejemplo 5: Solo medicamentos (retiro)
 
 **Asesor:** "Qué medicamentos tiene el 27248817939"
 
@@ -172,7 +202,7 @@ Encontré 202 autorizaciones. Las 5 más recientes:
 
 ¿Querés que te muestre más?
 
-## Ejemplo 5: Cronicidad
+## Ejemplo 7: Cronicidad
 
 **Asesor:** "Tratamientos crónicos del 20120667468"
 
@@ -184,7 +214,7 @@ Encontré 202 autorizaciones. Las 5 más recientes:
 - **Diabetes** — Atorvastatina 40mg, cobertura 50%, vence el 01/03/2025
 - **Alta Complejidad ABC** — Triamcinolona 40mg, cobertura 50%, vence el 15/06/2025
 
-## Ejemplo 7: Validar afiliado
+## Ejemplo 8: Validar afiliado
 
 **Asesor:** "¿El CUIL 20120667468 existe?"
 
@@ -192,7 +222,7 @@ Encontré 202 autorizaciones. Las 5 más recientes:
 
 **Respuesta:** Sí, existe como titular.
 
-## Ejemplo 8: CUIL faltante
+## Ejemplo 9: CUIL faltante
 
 **Asesor:** "Quiero ver las autorizaciones"
 
@@ -200,7 +230,7 @@ Encontré 202 autorizaciones. Las 5 más recientes:
 
 **Respuesta:** Para consultar autorizaciones necesito el CUIL del afiliado (11 dígitos sin guiones).
 
-## Ejemplo 9: Error de tool
+## Ejemplo 10: Error de tool
 
 **Asesor:** "Autorizaciones del 27248817939"
 
