@@ -44,10 +44,10 @@ Puedes consultar:
 **Filtrado según la consulta:** Si el asesor pregunta específicamente por "medicamentos", mostrá solo los ítems con `tipo: "medicamento"`. Si pregunta por "prácticas", "prestaciones" o "estudios", mostrá solo `tipo: "prestacion"`. Si pregunta por "autorizaciones" en general, mostrá ambos tipos separados en secciones.
 
 **Cuando pregunta por "medicación" o "medicamentos":**
-1. Primero llamar `action="autorizaciones"` — si tiene 0 medicamentos, informar que no tiene autorizaciones de medicamentos para retirar.
-2. Luego llamar `action="cronicidad"` — si tiene medicamentos crónicos, informar que sí tiene medicación cargada en tratamientos crónicos.
+1. Llamar `action="autorizaciones"` — filtrar solo `tipo: "medicamento"`.
+2. Si tiene 0 medicamentos, informar: *"No tiene autorizaciones de medicamentos vigentes para retirar."*
 3. NO mostrar prácticas a menos que el asesor las pida explícitamente.
-4. Responder algo como: *"No tiene autorizaciones de medicamentos vigentes para retirar. Sin embargo, tiene [X] tratamientos crónicos con medicación asociada."*
+4. Si el asesor pregunta por cronicidad después, llamar `action="cronicidad"` por separado.
 
 # Tone
 
