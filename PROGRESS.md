@@ -1,10 +1,10 @@
 # PROGRESS.md — Estado del proyecto osadef-api-asesores
 
-Ultima actualizacion: 2026-05-22
+Ultima actualizacion: 2026-05-29
 
 ## Plan general
 
-Construir una API REST que se conecte a la BD MySQL legacy de OSADEF para exponer datos medicos de afiliados (autorizaciones de medicamentos y tratamientos cronicos). Sera consumida exclusivamente por n8n (chat de IA para asesores dentro del portal).
+Construir una API REST que se conecte a la BD MySQL legacy de OSADEF para exponer datos medicos de afiliados (autorizaciones de medicamentos, tratamientos cronicos y estado de discapacidad/CUD). Sera consumida exclusivamente por n8n (chat de IA para asesores dentro del portal).
 
 La API sigue exactamente la misma metodologia, stack y convenciones que `osadef-api` (Fastify + Prisma + TypeScript estricto + Playwright + PM2 + Nginx).
 
@@ -97,17 +97,35 @@ La API sigue exactamente la misma metodologia, stack y convenciones que `osadef-
 > **HTTPS verificado:** Redirect 301 de HTTP → HTTPS funcionando ✅
 > **SSL verificado:** Certificado Let's Encrypt vigente hasta 2026-08-20 ✅
 
-### Fase 7: Integracion n8n + ElevenLabs — EN PROGRESO
-- [ ] Crear Agent en ElevenLabs Conversational AI (modo chat)
+### Fase 7: Integracion n8n + ElevenLabs — COMPLETADA
+- [x] Crear Agent en ElevenLabs Conversational AI (modo chat)
   - Ver guia: `docs/elevenlabs-setup.md`
-- [ ] Configurar system prompt y tool `consultar_datos_asesores`
-- [ ] Obtener `agent-id` del agente de ElevenLabs
-- [ ] Importar workflow `n8n-workflow.json` en n8n y activar webhook `asesores-chat`
-- [ ] Configurar widget embeddable en el portal de asesores (script de ElevenLabs)
-- [ ] Probar flujo completo: Portal → Chat → ElevenLabs → n8n → API → Respuesta
-- [ ] Documentar en n8n los prompts/intenciones mapeadas a cada endpoint
+- [x] Configurar system prompt y tool `consultar_datos_asesores`
+- [x] Obtener `agent-id` del agente de ElevenLabs
+- [x] Importar workflow `n8n-workflow.json` en n8n y activar webhook `asesores-chat`
+- [x] Configurar widget embeddable en el portal de asesores (script de ElevenLabs)
+- [x] Probar flujo completo: Portal → Chat → ElevenLabs → n8n → API → Respuesta
+- [x] Documentar en n8n los prompts/intenciones mapeadas a cada endpoint
 
 > **Nota:** Se decidio usar ElevenLabs Conversational AI (modo chat) para mantener coherencia con el ecosistema de chat de OSADEF. El flujo de prestadores usa CustomGPT + ElevenLabs (voz); el de asesores usa ElevenLabs Conversational AI (texto).
+
+### Fase 8: Consulta de CUD (Certificado Unico de Discapacidad) — COMPLETADA
+- [x] Extender endpoint `GET /afiliados/exists` con parametro `?include=basico,cud`
+- [x] Retorna datos del afiliado (apellido, sexo, activo, plan) e info CUD (tiene, certificado, diagnostico, vencimiento, estado)
+- [x] Logica de estado: Vigente (vtoCerInca >= hoy) o Vencido (vtoCerInca < hoy)
+- [x] Soporte para titulares (`incap`) y familiares (`incapaz`)
+- [x] Backward compatible: sin parametro `include` retorna formato original
+- [x] Actualizar n8n Parse Intent: action `cud` → `/afiliados/exists?include=basico,cud`
+- [x] Actualizar n8n Format Response: muestra info CUD formateada
+- [x] Actualizar system prompt de ElevenLabs con accion `cud` y ejemplos
+- [x] Actualizar elevenlabs-tool-config.json con nueva accion
+- [x] Tests: titulares y familiares con CUD verificados
+
+> **CUILs de prueba con CUD:**
+> - Titular: `20142334810` (PEREZ MIGUEL DARIO - Vigente)
+> - Titular: `20148771872` (LANGONE JORGE ANTONIO - Vigente)
+> - Familiar: `27401300673` (SALEGAS AILEN LOURDES - Vigente)
+> - Sin CUD: `20120667468` (SALINAS RODOLFO HECTOR)
 
 ## Dependencias externas
 
@@ -133,10 +151,9 @@ La API sigue exactamente la misma metodologia, stack y convenciones que `osadef-
 
 ## Proxima accion inmediata
 
-1. **Configurar n8n:** Crear credencial con `API_KEY_N8N_ASESORES` y workflow para chat de asesores.
-2. **Probar integracion end-to-end:** Portal → Chat → n8n → `https://asesores-api.osadef.org.ar` → Respuesta.
-3. **Restringir CORS:** Cambiar `origin: true` a dominios especificos de OSADEF en `src/plugins/cors.ts`.
-4. **Investigar PM2/systemd:** Para tener auto-restart en produccion.
+1. **Restringir CORS:** Cambiar `origin: true` a dominios especificos de OSADEF en `src/plugins/cors.ts`.
+2. **Mejorar paginacion:** Limitar resultados en `/autorizaciones` cuando hay muchos registros.
+3. **Agregar mas acciones:** Considerar nuevas acciones segun feedback de asesores (ej: diagnosticos, antecedentes).
 
 ## URLs de produccion
 
@@ -146,4 +163,4 @@ La API sigue exactamente la misma metodologia, stack y convenciones que `osadef-
 | Swagger UI | `https://asesores-api.osadef.org.ar/documentation` |
 | Autorizaciones | `https://asesores-api.osadef.org.ar/autorizaciones?cuil=...` |
 | Cronicidad | `https://asesores-api.osadef.org.ar/cronicidad?cuil=...` |
-| Afiliados (exists) | `https://asesores-api.osadef.org.ar/afiliados/exists?cuil=...` |
+| Afiliados (exists + CUD) | `https://asesores-api.osadef.org.ar/afiliados/exists?cuil=...&include=basico,cud` |

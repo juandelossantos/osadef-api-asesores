@@ -6,7 +6,7 @@ API for advisors (asesores) to query medical data (autorizaciones, cronicidad) f
 ## Stack
 Fastify + Prisma + TypeScript strict + Playwright tests + PM2 on port 3003.
 
-## Current State (May 28, 2026)
+## Current State (May 29, 2026)
 
 ### Endpoints
 | Endpoint | Description |
@@ -14,7 +14,7 @@ Fastify + Prisma + TypeScript strict + Playwright tests + PM2 on port 3003.
 | `GET /health` | Health check (no auth) |
 | `GET /autorizaciones?cuil=&nombre=&desde=&hasta=` | Unified: meds + practices via UNION ALL |
 | `GET /cronicidad?cuil=&monodroga=&vence_en_dias=` | Chronic treatments (meds only) |
-| `GET /afiliados/exists?cuil=` | Check if CUIL exists |
+| `GET /afiliados/exists?cuil=&include=basico,cud` | Check if CUIL exists + optional affiliate data + CUD info |
 
 ### Key Design Decisions
 - **Unified `/autorizaciones`**: UNION ALL of `llx_medica`, `llx_medica_familiar`, `llx_autorizacion_prestacion`, `llx_autorizacion_prestacion_familiar`. Returns `tipo: "medicamento"|"prestacion"` discriminator.
@@ -48,11 +48,12 @@ Built following ElevenLabs prompting guide best practices:
 - Webhook: `/webhook/asesores-chat`
 - Nodes: Webhook → Parse Intent → API Request → Format Response → Responder
 - Format Response uses `item.nombre`, `item.codigo`, `item.cobertura`
+- **Acciones soportadas:** `autorizaciones`, `cronicidad`, `exists`, `cud`, `discapacidad`, `certificado`
 
 ### Git
 - Remote: `https://github.com/juandelossantos/osadef-api-asesores.git`
 - Push works via `git config credential.helper store` (token stored)
-- Latest commit: `b262806`
+- Latest commit: `f6b17de`
 
 ## Critical Rules
 
