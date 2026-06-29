@@ -62,6 +62,27 @@ Built following ElevenLabs prompting guide best practices:
 - **NO implementar endpoints de escritura** (POST/PUT/DELETE). SOLO LECTURA.
 - **Sanitizar logs**: nunca loguear CUILs ni diagnósticos en producción.
 - **Siempre usar `?` placeholders** en `$queryRawUnsafe`. NUNCA concatenar strings.
+- **Host de BD de producción: `192.168.0.27:3306`** (IP interna de Huawei Cloud; la pública equivalente es `159.138.116.230`). Esta API corre en el host y llega a la BD por la IP interna. Ver `/home/AGENTS.md`.
+
+## Reglas de despliegue seguro
+
+> **Este servidor ES producción. No hay staging.** Reglas completas en `/home/AGENTS.md`.
+
+- **NUNCA `docker rm -f $(docker ps -aq)`**, `docker system prune` ni `docker volume prune` — mata el portal, n8n y elimina el volumen `n8n_data` (workflows + credenciales). Eliminar contenedores SOLO por nombre específico.
+- **NUNCA `docker compose down -v`** en ningún repo — el flag `-v` elimina volúmenes.
+- **Cada deploy es independiente.** Al deployar esta API (PM2), **no tocar** el portal (Docker), n8n (Docker), mcp-osadef (systemd) ni osadef-api (PM2).
+- **NUNCA reiniciar Docker (`systemctl restart docker`) sin necesidad** — interrumpe el portal y n8n.
+- **NUNCA `prisma migrate`** — la BD es legacy y compartida con el portal y osadef-api.
+- **Después de cada deploy, verificar TODOS los servicios críticos** (no solo esta API):
+  ```bash
+  curl -s http://127.0.0.1:3000/api/health   # portal
+  curl -s http://127.0.0.1:3001/health       # osadef-api
+  curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:3002/  # mcp
+  curl -s http://127.0.0.1:3003/health       # esta API (osadef-api-asesores)
+  curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5678/  # n8n
+  docker ps --format "table {{.Names}}\t{{.Status}}"
+  pm2 list
+  ```
 
 ## Deployment
 ```bash
