@@ -55,6 +55,35 @@ Built following ElevenLabs prompting guide best practices:
 - Push works via `git config credential.helper store` (token stored)
 - Latest commit: `f6b17de`
 
+## Auth — multi-key (agregado 04/09/2026)
+
+`auth-guard.ts` ya no compara contra una única key estática — busca el
+Bearer token en `config.apiKeys`, un mapa `key→etiqueta` armado en
+`src/config/env.ts` (mismo patrón que ya usa `cartilla-adef`,
+`src/config/env.js`). `API_KEY_N8N_ASESORES` (nombre histórico, la que ya
+tiene cargada el workflow real de n8n/ElevenLabs) sigue funcionando
+exactamente igual — se registra en el mapa con la etiqueta fija `"n8n"`.
+
+**Agregar un consumidor nuevo:**
+1. Generar la key: `openssl rand -hex 32`.
+2. Agregar `API_KEY_ASESORES_<ETIQUETA>=<key>` al `.env` (nunca al repo —
+   `.env` está en `.gitignore`).
+3. Reiniciar el servicio (`pm2 restart osadef-api-asesores` en prod, o
+   simplemente reiniciar el proceso en dev).
+4. Compartir la key por un canal seguro, nunca texto plano en chat/email.
+
+No hace falta tocar código — el mapa se arma solo leyendo variables de
+entorno al arrancar. `request.authUser.label` queda disponible para
+logs/rate-limit por identidad del consumidor en vez de por IP.
+
+**Nota de seguridad:** `API_KEY_N8N_ASESORES` está confirmada comprometida
+sin rotar (ver `mcp-osadef/docs/INFRAESTRUCTURA-Y-AUDITORIA.md` §H2 — el
+server tuvo un compromiso real con ~4,5 meses de acceso root, y ese
+secreto nunca se rotó desde entonces). El consumidor `widget-chat-adef`
+usa una key propia y nueva (`API_KEY_ASESORES_WIDGET_CHAT`) precisamente
+para no depender de la comprometida — evaluar rotar la de n8n cuando se
+coordine con quien administra el server `prestadores`.
+
 ## Critical Rules
 
 - **NUNCA ejecutar `prisma migrate`** — BD es legacy y compartida. Solo `prisma generate` y `prisma db pull`.

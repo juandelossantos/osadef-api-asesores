@@ -1,6 +1,6 @@
 # PROGRESS.md — Estado del proyecto osadef-api-asesores
 
-Ultima actualizacion: 2026-05-29
+Ultima actualizacion: 2026-09-09
 
 ## Plan general
 
@@ -127,6 +127,59 @@ La API sigue exactamente la misma metodologia, stack y convenciones que `osadef-
 > - Familiar: `27401300673` (SALEGAS AILEN LOURDES - Vigente)
 > - Sin CUD: `20120667468` (SALINAS RODOLFO HECTOR)
 
+### Fase 9: Multi-key auth para consumidores nuevos — COMPLETADA (09/09/2026)
+
+Contexto: `widget-chat-adef` (chat de afiliados, repo hermano) necesita
+consumir `/autorizaciones`, `/cronicidad` y `/afiliados/exists` para su
+propia Fase 2. Se encontró que `API_KEY_N8N_ASESORES` está **confirmada
+comprometida sin rotar** (servidor `prestadores` tuvo ~4,5 meses de acceso
+root de un atacante — ver `mcp-osadef/docs/INFRAESTRUCTURA-Y-AUDITORIA.md`
+§H2) — decisión (confirmada por el dueño): en vez de sumar
+`widget-chat-adef` como consumidor de esa key comprometida, se agregó
+soporte multi-key para que tenga su propia key revocable.
+
+- [x] `src/config/env.ts`: `construirMapaApiKeys()` — mapa key→etiqueta
+      armado de variables de entorno (`API_KEY_ASESORES_<ETIQUETA>`),
+      mismo patrón que `cartilla-adef`. `API_KEY_N8N_ASESORES` (histórica)
+      sigue funcionando igual, registrada con etiqueta fija `"n8n"`.
+- [x] `src/middleware/auth-guard.ts`: busca en el mapa en vez de comparar
+      contra una sola key; mismo mensaje de error genérico en los 3 casos
+      (sin header, header mal formado, key inexistente).
+- [x] Bug real encontrado de paso: `GET /afiliados/exists?include=basico`
+      crasheaba con 500 (pedía una columna `nombre` que no existe en
+      `llx_afiliado`) — corregido, más 2 campos (`plan`, `cud.estado`) que
+      Fastify serializaba como `""` en vez de `null`.
+- [x] Tests: 21/21 (`npm test`), incluida la colisión de keys duplicadas y
+      la compatibilidad hacia atrás con la key de n8n.
+- [x] `/code-review` + `/security-review` corridos, hallazgos reales
+      corregidos (mensaje de error no unificado, colisión de keys sin
+      resolver a favor del registro más viejo).
+- [x] Rebaseada sobre `main` (resolvió conflicto real en
+      `afiliados/exists.ts` — `main` había arreglado el mismo bug de
+      `nombre` inexistente por su cuenta; se mantuvo la versión más
+      completa, que además blinda `apellido`/`sexo`/`plan` como nullable),
+      pusheada y mergeada vía PR (09/09/2026).
+
+**Pendiente real antes de que `widget-chat-adef` use esto en producción**
+(no bloqueante para el desarrollo local de `widget-chat-adef`, que ya usa
+una key propia vía este multi-key en su `.env` local):
+
+1. Generar la key real de producción para `widget-chat-adef`:
+   `openssl rand -hex 32`, agregarla como
+   `API_KEY_ASESORES_WIDGET_CHAT=<key>` al `.env` real del servidor
+   `prestadores` (no el de desarrollo local usado hasta ahora).
+2. Deploy normal (`git pull && npm ci && npx prisma generate && npm run
+   build && pm2 restart osadef-api-asesores` — ver sección Deployment de
+   `AGENTS.md`). Backward-compatible: no afecta al consumidor n8n
+   existente, se puede deployar sin coordinar downtime.
+3. Compartir esa key real con `widget-chat-adef` por un canal seguro
+   (nunca chat/email en texto plano) y cargarla en su `.env` de
+   producción como `ASESORES_API_KEY`.
+4. Evaluar (decisión separada, no bloqueante para lo anterior): rotar
+   `API_KEY_N8N_ASESORES` dado el hallazgo H2 — requiere coordinar con
+   quien administra `prestadores` y actualizar la credencial ya cargada
+   en el workflow real de n8n/ElevenLabs.
+
 ## Dependencias externas
 
 | Dependencia | Estado | Responsable |
@@ -154,6 +207,8 @@ La API sigue exactamente la misma metodologia, stack y convenciones que `osadef-
 1. **Restringir CORS:** Cambiar `origin: true` a dominios especificos de OSADEF en `src/plugins/cors.ts`.
 2. **Mejorar paginacion:** Limitar resultados en `/autorizaciones` cuando hay muchos registros.
 3. **Agregar mas acciones:** Considerar nuevas acciones segun feedback de asesores (ej: diagnosticos, antecedentes).
+4. **Generar y cargar `API_KEY_ASESORES_WIDGET_CHAT`** para `widget-chat-adef`
+   cuando llegue a su Bloque 2-4 — ver detalle completo en Fase 9.
 
 ## URLs de produccion
 

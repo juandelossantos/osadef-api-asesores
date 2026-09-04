@@ -67,10 +67,24 @@ export default async function afiliadosExistsRoute(fastify: FastifyInstance) {
                 type: "object",
                 nullable: true,
                 properties: {
-                  apellido: { type: "string" },
-                  sexo: { type: "string" },
+                  // `apellido`/`sexo` son nullable en la columna real de
+                  // MySQL (`String? @default("")` en schema.prisma) aunque
+                  // el default evita que hoy vengan NULL en la práctica —
+                  // una fila legacy insertada antes de ese default (o por
+                  // SQL directo) sin este `nullable: true` pasaría por el
+                  // mismo bug de serialización que `nombre`/`plan`/`estado`
+                  // más abajo (Fastify convierte un `null` real en `""`
+                  // silenciosamente si el schema no admite null).
+                  apellido: { type: "string", nullable: true },
+                  // `llx_afiliado`/`llx_familiar` (legacy) no tienen una
+                  // columna `nombre` separada de `apellido` — siempre es
+                  // null hoy, no `""`.
+                  nombre: { type: "string", nullable: true },
+                  sexo: { type: "string", nullable: true },
                   activo: { type: "boolean" },
-                  plan: { type: "string" },
+                  // null para familiares (no tienen plan propio, ver más
+                  // abajo) — mismo motivo que nombre/apellido/sexo.
+                  plan: { type: "string", nullable: true },
                 },
               },
               cud: {
@@ -81,7 +95,9 @@ export default async function afiliadosExistsRoute(fastify: FastifyInstance) {
                   certificado: { type: "string", nullable: true },
                   diagnostico: { type: "string", nullable: true },
                   vencimiento: { type: "string", nullable: true },
-                  estado: { type: "string", nullable: true, example: "Vigente" },
+                  // null cuando `tiene` es false (el caso más común) — sin
+                  // `nullable: true`, Fastify lo serializaba como `""`.
+                  estado: { type: "string", example: "Vigente", nullable: true },
                 },
               },
             },
@@ -108,6 +124,11 @@ export default async function afiliadosExistsRoute(fastify: FastifyInstance) {
         select: {
           rowid: true,
           ...(wantBasico && {
+            // `llx_afiliado` (legacy) no tiene columna `nombre` separada de
+            // `apellido` — mismo caso que `llx_familiar` más abajo, que ya
+            // no la pedía. Pedirla acá tiraba abajo el endpoint entero con
+            // un 500 de Prisma ("Unknown field `nombre`") en cualquier
+            // consulta con include=basico, sin importar el CUIL.
             apellido: true,
             sexo: true,
             activo: true,
@@ -128,6 +149,7 @@ export default async function afiliadosExistsRoute(fastify: FastifyInstance) {
         if (wantBasico) {
           response.afiliado = {
             apellido: titular.apellido,
+            nombre: null,
             sexo: titular.sexo,
             activo: titular.activo === 1,
             plan: titular.plan,
