@@ -82,8 +82,12 @@ La API sigue exactamente la misma metodologia, stack y convenciones que `osadef-
 - [x] `npm ci && npx prisma generate` ejecutado
 - [x] Configurar `.env.production` con credenciales de BD prod y API Key
 - [x] `npm run build` ejecutado (compilacion exitosa)
-- [x] Servidor corriendo en produccion (puerto 3003) — Iniciado con `nohup node dist/index.js &`
-  - **Nota:** PM2 daemon presenta problemas en este servidor (timeout al iniciar). Se usa `nohup` como workaround. Recomendable investigar PM2 o migrar a systemd para auto-restart.
+- [x] Servidor corriendo en produccion (puerto 3003) bajo **PM2 real** —
+  migrado el 09/09/2026 del `nohup` huerfano original a
+  `pm2 start ecosystem.config.cjs` + `pm2 save` (el daemon de PM2 sí
+  funciona en este servidor; el problema original no volvió a aparecer).
+  `pm2-root.service` ya estaba `enabled` (systemd), así que sobrevive un
+  reinicio del servidor sin nada adicional.
 - [x] Configurar Nginx reverse proxy
   - Subdominio: `asesores-api.osadef.org.ar` → `127.0.0.1:3003`
   - Config: `/etc/nginx/sites-available/asesores-api-osadef` → `sites-enabled`
@@ -160,25 +164,25 @@ soporte multi-key para que tenga su propia key revocable.
       completa, que además blinda `apellido`/`sexo`/`plan` como nullable),
       pusheada y mergeada vía PR (09/09/2026).
 
-**Pendiente real antes de que `widget-chat-adef` use esto en producción**
-(no bloqueante para el desarrollo local de `widget-chat-adef`, que ya usa
-una key propia vía este multi-key en su `.env` local):
+**Completado el 09/09/2026** (era la sección "pendiente antes de
+producción", ya resuelta):
 
-1. Generar la key real de producción para `widget-chat-adef`:
-   `openssl rand -hex 32`, agregarla como
-   `API_KEY_ASESORES_WIDGET_CHAT=<key>` al `.env` real del servidor
-   `prestadores` (no el de desarrollo local usado hasta ahora).
-2. Deploy normal (`git pull && npm ci && npx prisma generate && npm run
-   build && pm2 restart osadef-api-asesores` — ver sección Deployment de
-   `AGENTS.md`). Backward-compatible: no afecta al consumidor n8n
-   existente, se puede deployar sin coordinar downtime.
-3. Compartir esa key real con `widget-chat-adef` por un canal seguro
-   (nunca chat/email en texto plano) y cargarla en su `.env` de
-   producción como `ASESORES_API_KEY`.
-4. Evaluar (decisión separada, no bloqueante para lo anterior): rotar
-   `API_KEY_N8N_ASESORES` dado el hallazgo H2 — requiere coordinar con
-   quien administra `prestadores` y actualizar la credencial ya cargada
-   en el workflow real de n8n/ElevenLabs.
+- [x] Deploy real en `176.52.133.47` — de paso se migró el proceso de un
+      `nohup` huérfano a PM2 real (ver Fase 6 arriba).
+- [x] Key de producción generada y cargada en `widget-chat-adef` como
+      `ASESORES_API_KEY` — la primera versión se filtró sin querer al
+      chat de una sesión de trabajo, se descartó y se rotó por una
+      segunda que nunca pasó por ningún chat.
+- [x] Fase 2 de `widget-chat-adef` confirmada funcionando con datos
+      reales (autorizaciones y cronicidad), incluida una nueva regla de
+      redacción del nombre del medicamento para `/cronicidad` (ver
+      `widget-chat-adef/docs/ROLLOUT-PRODUCCION.md`).
+
+**Pendiente real, sin fecha** (decisión separada, no bloqueante): rotar
+`API_KEY_N8N_ASESORES` dado el hallazgo H2 (servidor `prestadores` tuvo
+~4,5 meses de acceso root de un atacante) — requiere coordinar con quien
+administra `prestadores` y actualizar la credencial ya cargada en el
+workflow real de n8n/ElevenLabs.
 
 ## Dependencias externas
 
@@ -207,8 +211,16 @@ una key propia vía este multi-key en su `.env` local):
 1. **Restringir CORS:** Cambiar `origin: true` a dominios especificos de OSADEF en `src/plugins/cors.ts`.
 2. **Mejorar paginacion:** Limitar resultados en `/autorizaciones` cuando hay muchos registros.
 3. **Agregar mas acciones:** Considerar nuevas acciones segun feedback de asesores (ej: diagnosticos, antecedentes).
-4. **Generar y cargar `API_KEY_ASESORES_WIDGET_CHAT`** para `widget-chat-adef`
-   cuando llegue a su Bloque 2-4 — ver detalle completo en Fase 9.
+4. ~~Generar y cargar `API_KEY_ASESORES_WIDGET_CHAT`~~ — **HECHO 09/09/2026**:
+   `widget-chat-adef` ya la tiene cargada en produccion y `/cronicidad` +
+   `/autorizaciones` estan siendo consumidos de verdad desde el chat de
+   afiliados (Fase 2 completa, ver `widget-chat-adef/docs/ROLLOUT-PRODUCCION.md`).
+5. **Nota de arquitectura pendiente (no bloqueante):** `request.authUser.label`
+   se captura pero no se usa para scoping por ruta — todo consumidor
+   autenticado (n8n, widget-chat-adef) tiene acceso identico a todos los
+   endpoints. Separar las keys ya reduce el impacto de una key vieja
+   comprometida solo parcialmente; scoping real seria el siguiente paso
+   si se necesita aislar consumidores de verdad.
 
 ## URLs de produccion
 
