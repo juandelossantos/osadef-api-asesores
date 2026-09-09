@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import { ChildProcess, spawn } from "child_process";
 import path from "path";
 import dotenv from "dotenv";
+import { construirMapaApiKeys } from "../src/config/env";
 
 // Cargar variables de entorno para el proceso de tests
 dotenv.config({ path: path.resolve(__dirname, "..", ".env.development") });
@@ -12,6 +13,8 @@ dotenv.config({ path: path.resolve(__dirname, "..", ".env") });
 const BASE_URL = "http://localhost:3003";
 const API_KEY = process.env.API_KEY_N8N_ASESORES!;
 const CUIL_TEST = "20120667468"; // CUIL de prueba (validar contra BD real)
+const CUIL_TEST_SIN_CUD = CUIL_TEST; // mismo CUIL: confirmado cud.tiene=false
+const CUIL_FAMILIAR_TEST = "20005148562"; // familiar real (llx_familiar), confirmado tipo="familiar"
 
 let server: ChildProcess;
 
@@ -116,6 +119,51 @@ test.describe("API OSADEF Asesores — Tests de integracion HTTP", () => {
     expect(response.status()).toBe(401);
   });
 
+  // ─── 2b. Multi-key (auth-guard.ts + config/env.ts) ──────────
+
+  test("API Key de un consumidor nuevo (API_KEY_ASESORES_WIDGET_CHAT) autentica igual que la de n8n", async ({ request }) => {
+    const keyConsumidorNuevo = process.env.API_KEY_ASESORES_WIDGET_CHAT;
+    // Si el .env de este ambiente no tiene esa variable, el test no aplica
+    // acá (ver .env.example de este repo) — no es un fallo del código.
+    test.skip(!keyConsumidorNuevo, "API_KEY_ASESORES_WIDGET_CHAT no está configurada en este .env");
+
+    const response = await request.get(`${BASE_URL}/afiliados/exists?cuil=${CUIL_TEST}`, {
+      headers: { Authorization: `Bearer ${keyConsumidorNuevo}` },
+    });
+    expect(response.status()).toBe(200);
+  });
+
+  test("API Key de n8n sigue funcionando sin cambios (compatibilidad hacia atrás)", async ({ request }) => {
+    const response = await request.get(`${BASE_URL}/afiliados/exists?cuil=${CUIL_TEST}`, {
+      headers: { Authorization: `Bearer ${API_KEY}` },
+    });
+    expect(response.status()).toBe(200);
+  });
+
+  test("construirMapaApiKeys() — una key nueva que reusa por error el mismo valor que la de n8n NO le roba la etiqueta (gana la primera registrada)", () => {
+    const valorCompartido = "valor-de-prueba-reusado-por-error";
+    const envOriginal = {
+      API_KEY_N8N_ASESORES: process.env.API_KEY_N8N_ASESORES,
+      API_KEY_ASESORES_OTRO: process.env.API_KEY_ASESORES_OTRO,
+    };
+
+    process.env.API_KEY_N8N_ASESORES = valorCompartido;
+    process.env.API_KEY_ASESORES_OTRO = valorCompartido;
+
+    try {
+      const mapa = construirMapaApiKeys();
+      expect(mapa[valorCompartido]).toBe("n8n");
+    } finally {
+      // Restaurar exactamente como estaba — este test corre en el mismo
+      // proceso que el resto (no hay aislamiento de process.env entre
+      // tests de Playwright).
+      if (envOriginal.API_KEY_N8N_ASESORES === undefined) delete process.env.API_KEY_N8N_ASESORES;
+      else process.env.API_KEY_N8N_ASESORES = envOriginal.API_KEY_N8N_ASESORES;
+      if (envOriginal.API_KEY_ASESORES_OTRO === undefined) delete process.env.API_KEY_ASESORES_OTRO;
+      else process.env.API_KEY_ASESORES_OTRO = envOriginal.API_KEY_ASESORES_OTRO;
+    }
+  });
+
   // ─── 3. Validaciones de input ───────────────────────────────
 
   test("GET /autorizaciones sin ?cuil — 400", async ({ request }) => {
@@ -156,6 +204,47 @@ test.describe("API OSADEF Asesores — Tests de integracion HTTP", () => {
     if (body.exists) {
       expect(["titular", "familiar"]).toContain(body.tipo);
     }
+  });
+
+  test("GET /afiliados/exists?include=basico — no explota con un titular (regresión: llx_afiliado no tiene columna `nombre`)", async ({ request }) => {
+    const response = await request.get(
+      `${BASE_URL}/afiliados/exists?cuil=${CUIL_TEST}&include=basico`,
+      { headers: { Authorization: `Bearer ${API_KEY}` } },
+    );
+
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    if (body.exists && body.tipo === "titular") {
+      expect(body.afiliado).toBeDefined();
+      expect(body.afiliado.nombre).toBeNull();
+      expect(typeof body.afiliado.apellido).toBe("string");
+    }
+  });
+
+  test("GET /afiliados/exists?include=cud — cud.estado es JSON null (no \"\") cuando tiene=false (regresión: schema sin nullable coercionaba a string vacío)", async ({ request }) => {
+    const response = await request.get(
+      `${BASE_URL}/afiliados/exists?cuil=${CUIL_TEST_SIN_CUD}&include=cud`,
+      { headers: { Authorization: `Bearer ${API_KEY}` } },
+    );
+
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(body.cud).toBeDefined();
+    expect(body.cud.tiene).toBe(false);
+    expect(body.cud.estado).toBeNull();
+  });
+
+  test("GET /afiliados/exists?include=basico — afiliado.plan es JSON null (no \"\") para un familiar (regresión: mismo bug de nullable que nombre/estado)", async ({ request }) => {
+    const response = await request.get(
+      `${BASE_URL}/afiliados/exists?cuil=${CUIL_FAMILIAR_TEST}&include=basico`,
+      { headers: { Authorization: `Bearer ${API_KEY}` } },
+    );
+
+    expect(response.status()).toBe(200);
+    const body = await response.json();
+    expect(body.tipo).toBe("familiar");
+    expect(body.afiliado).toBeDefined();
+    expect(body.afiliado.plan).toBeNull();
   });
 
   // ─── 5. Autorizaciones (medicamentos + prácticas) ────────────
